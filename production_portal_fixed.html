@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0e1f3d">
+<title>Production Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#f0f2f7;--surface:#fff;--surface2:#f6f8fc;--border:#e2e8f0;
+  --brand:#0e1f3d;--accent:#f0a500;--blue:#2563eb;--green:#16a34a;
+  --red:#dc2626;--purple:#7c3aed;--text:#1e293b;--muted:#64748b;
+  --cl:#2563eb;--ef:#c0392b;
+  --nav:56px;--safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;overflow-y:auto}
+
+/* LOGIN */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--brand);padding:24px;position:fixed;inset:0;z-index:999}
+.login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.login-logo{text-align:center;margin-bottom:8px}
+.login-logo-text{font-size:22px;font-weight:800;color:var(--brand);letter-spacing:-0.5px}
+.login-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.login-err{color:var(--red);font-size:13px;margin-bottom:10px;display:none}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--text);background:#fff;outline:none;-webkit-appearance:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--brand)}
+.form-group textarea{resize:vertical;min-height:80px}
+
+/* TOPBAR */
+.topbar{background:var(--brand);color:#fff;display:flex;align-items:center;padding:calc(var(--safe-top) + 8px) 14px 8px;gap:10px;position:sticky;top:0;z-index:100;min-height:52px}
+.topbar-title{flex:1;font-size:14px;font-weight:700}
+.topbar-title small{display:block;font-size:10px;color:rgba(255,255,255,.5);font-weight:400;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.topbar-user{display:flex;align-items:center;gap:8px}
+.user-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;background:var(--accent)}
+
+/* BOTTOM NAV */
+.botnav{background:var(--brand);display:flex;position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav) + var(--safe-bot));padding-bottom:var(--safe-bot);z-index:100;border-top:1px solid rgba(255,255,255,.1)}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:rgba(255,255,255,.5);border:none;background:none;padding:6px 0;position:relative;min-height:44px;font-family:inherit}
+.bn-item.active{color:#fff}
+.bn-item.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--accent);border-radius:0 0 3px 3px}
+.bn-icon{font-size:20px}
+.bn-label{font-size:10px;font-weight:600}
+.bn-badge{position:absolute;top:4px;right:calc(50% - 20px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+
+/* CONTENT */
+.content{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav) + var(--safe-bot) + 8px);min-height:100vh}
+.page{display:none;padding:12px;max-width:520px;margin:0 auto}
+.page.active{display:block}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+
+/* STAT GRID */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;border-top:3px solid var(--sc,var(--accent))}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.stat-value{font-size:24px;font-weight:800;color:var(--sc,var(--brand));line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ORDER CARD */
+.order-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;cursor:pointer;transition:all .15s;position:relative}
+.order-card:active{transform:scale(.98);background:var(--surface2)}
+.order-card-stripe{position:absolute;top:0;left:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
+.order-card-inner{padding-left:8px}
+.order-ref{font-size:12px;font-weight:700;color:var(--muted)}
+.order-customer{font-size:15px;font-weight:700;color:var(--brand);margin:2px 0}
+.order-product{font-size:12px;color:var(--muted)}
+
+/* COMPANY BADGE */
+.cbadge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.cbadge-cl{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
+.cbadge-ef{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}
+.cbadge-manual{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
+
+/* STATUS BADGE */
+.sbadge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.sb-queue{background:#fff7ed;color:#c2410c}
+.sb-printing{background:#eff6ff;color:#1d4ed8}
+.sb-slitting{background:#f5f3ff;color:#6d28d9}
+.sb-packing{background:#fdf4ff;color:#86198f}
+.sb-ready{background:#dcfce7;color:#15803d}
+.sb-nomaterial{background:#fff1f2;color:#be123c}
+.sb-done{background:#dcfce7;color:#15803d}
+.sb-default{background:#f1f5f9;color:#64748b}
+
+/* PROGRESS */
+.prog-bar{background:#e2e8f0;border-radius:20px;height:8px;overflow:hidden;margin:8px 0}
+.prog-fill{height:100%;border-radius:20px;transition:width .5s}
+
+/* STATUS FLOW STEPS */
+.status-steps{display:flex;gap:0;margin:12px 0}
+.sstep{flex:1;text-align:center;font-size:10px;padding:6px 2px;border-radius:6px;cursor:pointer;transition:all .15s;border:1.5px solid var(--border);background:#fff;color:var(--muted);margin:0 2px;font-weight:600}
+.sstep:active{transform:scale(.95)}
+.sstep.done{background:var(--brand);color:#fff;border-color:var(--brand)}
+.sstep.current{background:var(--accent);color:#000;border-color:var(--accent)}
+.sstep-icon{display:block;font-size:16px;margin-bottom:2px}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:10px}
+.search-wrap input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface);outline:none}
+.search-wrap input:focus{border-color:var(--brand)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--muted)}
+
+/* FILTER PILLS */
+.pill-row{display:flex;gap:7px;overflow-x:auto;padding:2px 0;margin-bottom:10px;scrollbar-width:none}
+.pill-row::-webkit-scrollbar{display:none}
+.pill{padding:6px 13px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.pill.active{border-color:var(--brand);background:var(--brand);color:#fff}
+.pill-cl{border-color:var(--cl);color:var(--cl)}
+.pill-cl.active{background:var(--cl);color:#fff}
+.pill-ef{border-color:var(--ef);color:var(--ef)}
+.pill-ef.active{background:var(--ef);color:#fff}
+
+/* SHEET */
+.sheet-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300}
+.sheet-bg.open{display:block}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;z-index:301;max-height:92vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.sheet.open{transform:translateY(0)}
+.sheet-handle{width:40px;height:4px;background:#d1d5db;border-radius:2px;margin:10px auto 0}
+.sheet-hd{padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
+.sheet-title{font-size:16px;font-weight:700}
+.sheet-body{overflow-y:auto;padding:16px;flex:1;-webkit-overflow-scrolling:touch}
+.sheet-foot{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;padding-bottom:calc(12px + var(--safe-bot))}
+
+/* DETAIL ROWS */
+.drow{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px}
+.drow:last-child{border-bottom:none}
+.dlabel{color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.dvalue{font-weight:600;text-align:right;color:var(--text)}
+
+/* STATUS BUTTONS IN DETAIL */
+.status-btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.status-btn{padding:10px 6px;border-radius:10px;border:2px solid var(--border);background:#fff;font-size:11px;font-weight:700;cursor:pointer;text-align:center;transition:all .15s}
+.status-btn:active{transform:scale(.95)}
+.status-btn.active{border-color:var(--brand);background:var(--brand);color:#fff}
+.status-btn-icon{display:block;font-size:18px;margin-bottom:3px}
+
+/* BUTTONS */
+.btn{padding:11px 18px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;transition:all .15s;width:100%;font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-outline{background:#fff;color:var(--brand);border:1.5px solid var(--border)}
+.btn-sm{padding:7px 14px;font-size:12px;min-height:36px;border-radius:8px;width:auto}
+.btn-danger{background:#fff0f0;color:var(--red);border:1px solid #fca5a5}
+
+/* SECTION HEADER */
+.sec-hd{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;padding-left:2px}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 16px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:10px}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(var(--nav) + var(--safe-bot) + 12px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--brand);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* IMPORT */
+.import-zone{border:2px dashed var(--border);border-radius:16px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .3s;position:relative;margin-bottom:14px}
+.import-zone:hover,.import-zone.drag{border-color:var(--accent);background:rgba(240,165,0,.04)}
+.import-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.pbar{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin:10px 0}
+.pbar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+.ilog{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11px;line-height:1.8;max-height:200px;overflow-y:auto;font-family:monospace}
+.lok{color:var(--green)}.lwarn{color:orange}.lerr{color:var(--red)}
+
+hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.mt{margin-top:8px}
+.hidden{display:none!important}
+
+@media(min-width:600px){
+  .botnav{max-width:520px;left:50%;transform:translateX(-50%);border-radius:16px 16px 0 0}
+  .topbar{max-width:520px;margin:0 auto}
+  .sheet{max-width:520px;left:50%;transform:translateX(-50%) translateY(100%)}
+  .sheet.open{transform:translateX(-50%) translateY(0)}
+  .sheet-bg{max-width:520px;left:50%;transform:translateX(-50%)}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-text">🏭 PRODUCTION PORTAL</div>
+    </div>
+    <div class="login-sub">Cups & Labels · Al Fatora Al Mowahda</div>
+    <div class="form-group"><label>Username</label><input id="li-u" placeholder="username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="form-group"><label>Password</label><input id="li-p" type="password" placeholder="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-err" id="li-err">Invalid username or password</div>
+    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="appWrap" class="hidden">
+
+<div class="topbar">
+  <div class="topbar-title">
+    🏭 Production Portal
+    <small id="sync-label">Connecting…</small>
+  </div>
+  <div class="topbar-user">
+    <div class="sync-dot" id="sync-dot"></div>
+    <div class="user-av" id="nav-av">P</div>
+    <button onclick="doLogout()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;padding:4px">✕</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card" style="--sc:var(--accent)"><div class="stat-label">Queue</div><div class="stat-value" id="s-queue">—</div><div class="stat-sub">Waiting</div></div>
+      <div class="stat-card" style="--sc:var(--blue)"><div class="stat-label">In Production</div><div class="stat-value" id="s-prod">—</div><div class="stat-sub">Active</div></div>
+      <div class="stat-card" style="--sc:var(--green)"><div class="stat-label">Ready</div><div class="stat-value" id="s-ready">—</div><div class="stat-sub">For delivery</div></div>
+      <div class="stat-card" style="--sc:var(--brand)"><div class="stat-label">Total</div><div class="stat-value" id="s-total">—</div><div class="stat-sub">All orders</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">By Company</div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1;text-align:center;padding:12px;background:#dbeafe;border-radius:10px">
+          <div style="font-size:22px;font-weight:800;color:#1d4ed8" id="s-cl">—</div>
+          <div style="font-size:11px;color:#1d4ed8;font-weight:700;margin-top:2px">🔵 Cups & Labels</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:12px;background:#fee2e2;border-radius:10px">
+          <div style="font-size:22px;font-weight:800;color:#b91c1c" id="s-ef">—</div>
+          <div style="font-size:11px;color:#b91c1c;font-weight:700;margin-top:2px">🔴 Al Fatora</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-hd">🔔 Ready for Delivery</div>
+    <div id="dash-ready"></div>
+    <div class="sec-hd">⚡ Recently Updated</div>
+    <div id="dash-recent"></div>
+  </div>
+
+  <!-- ORDERS -->
+  <div class="page" id="page-orders">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search customer, order…" oninput="filterOrders(this.value)" id="orders-search">
+    </div>
+    <div class="pill-row" id="status-pills"></div>
+    <div class="pill-row">
+      <div class="pill active" onclick="setCompFilter('',this)">All Companies</div>
+      <div class="pill pill-cl" onclick="setCompFilter('cl',this)">🔵 Cups & Labels</div>
+      <div class="pill pill-ef" onclick="setCompFilter('ef',this)">🔴 Al Fatora</div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="orders-count"></div>
+    <div id="orders-list"></div>
+  </div>
+
+  <!-- IMPORT -->
+  <div class="page" id="page-import">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Import Excel</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Upload production data from Excel</div>
+
+    <div class="import-zone" id="import-zone" ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="this.classList.remove('drag')">
+      <input type="file" accept=".xlsx,.xls" onchange="handleFileUpload(this.files[0])">
+      <div style="font-size:40px;margin-bottom:8px">📊</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Drop Excel File Here</div>
+      <div style="font-size:12px;color:var(--muted)">or tap to browse · .xlsx and .xls</div>
+    </div>
+
+    <div id="import-wrap" class="hidden">
+      <div class="card">
+        <div id="import-fname" style="font-size:13px;color:var(--accent);margin-bottom:10px"></div>
+        <div class="pbar"><div class="pbar-fill" id="import-prog" style="width:0%"></div></div>
+        <div id="import-status" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+        <div class="ilog" id="import-log"></div>
+      </div>
+    </div>
+    <div id="import-summary" class="hidden">
+      <div class="stats-grid" id="import-cards"></div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-green" style="flex:2" onclick="commitImport()">✓ Save to Firebase</button>
+        <button class="btn btn-outline" style="flex:1;width:auto" onclick="resetImport()">✕ Cancel</button>
+      </div>
+    </div>
+
+    <hr>
+    <div class="card">
+      <div class="card-title">Firebase Sync</div>
+      <div id="firebase-status" style="font-size:13px;line-height:2;margin-bottom:12px">Loading…</div>
+      <button class="btn btn-primary" style="margin-bottom:8px" onclick="syncFromFirebase()">↓ Pull from Firebase</button>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- BOTTOM NAV -->
+<div class="botnav">
+  <button class="bn-item active" onclick="goPage('dashboard',this)">
+    <span class="bn-icon">📊</span><span class="bn-label">Dashboard</span>
+  </button>
+  <button class="bn-item" onclick="goPage('orders',this)">
+    <span class="bn-icon">📦</span><span class="bn-label">Orders</span>
+    <span class="bn-badge hidden" id="ready-badge">0</span>
+  </button>
+  <button class="bn-item" onclick="goPage('import',this)">
+    <span class="bn-icon">📥</span><span class="bn-label">Import</span>
+  </button>
+</div>
+
+</div><!-- /appWrap -->
+
+<!-- BOTTOM SHEET -->
+<div class="sheet-bg" id="sheet-bg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-hd">
+    <div class="sheet-title" id="sheet-title">Order Details</div>
+    <button onclick="closeSheet()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted);padding:4px">✕</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+  <div class="sheet-foot" id="sheet-foot"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════
+// USERS
+// ══════════════════════════════
+const USERS = {
+  prod_admin:  { pass:'prod123',  name:'Production Admin', role:'admin',    av:'PA' },
+  operator1:   { pass:'op123',    name:'Operator 1',       role:'operator', av:'O1' },
+  operator2:   { pass:'op456',    name:'Operator 2',       role:'operator', av:'O2' },
+  supervisor1: { pass:'sup123',   name:'Supervisor',       role:'admin',    av:'SV' },
+};
+
+let CU = null;
+
+function doLogin() {
+  const u = (document.getElementById('li-u').value||'').trim().toLowerCase();
+  const p = (document.getElementById('li-p').value||'').trim();
+  const err = document.getElementById('li-err');
+  err.style.display = 'none';
+  if(!u||!p){ err.style.display='block'; err.textContent='Enter username and password'; return; }
+  const user = USERS[u];
+  if(!user || user.pass !== p){ err.style.display='block'; err.textContent='Invalid username or password'; return; }
+  CU = { id:u, ...user };
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appWrap').classList.remove('hidden');
+  document.getElementById('nav-av').textContent = CU.av;
+  initFirebase();
+}
+
+function doLogout() {
+  CU = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appWrap').classList.add('hidden');
+  document.getElementById('li-u').value = '';
+  document.getElementById('li-p').value = '';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var lip = document.getElementById('li-p');
+  if(lip) lip.addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+  var liu = document.getElementById('li-u');
+  if(liu) liu.addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+});
+
+// ══════════════════════════════
+// FIREBASE
+// ══════════════════════════════
+const firebaseConfig = { databaseURL: "https://cups-and-labels-default-rtdb.firebaseio.com" };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let crmOrders = {};
+
+function initFirebase() {
+  db.ref('.info/connected').on('value', snap => {
+    const ok = snap.val();
+    document.getElementById('sync-dot').style.background = ok ? '#22c55e' : '#ef4444';
+    document.getElementById('sync-label').textContent = ok ? 'Live · Firebase' : 'Reconnecting…';
+  });
+  // Listen to ALL production orders (both companies)
+  db.ref('production/orders').on('value', snap => {
+    crmOrders = snap.val() || {};
+    renderDash();
+    renderOrdersList();
+    updateReadyBadge();
+    updateFirebaseStatus();
+  });
+}
+
+// ══════════════════════════════
+// STATUS CONFIG
+// ══════════════════════════════
+const STATUSES = [
+  { key:'queue',      label:'In Queue',   icon:'⏳', badge:'sb-queue',      pct:10,  color:'#ea580c' },
+  { key:'printing',   label:'Printing',   icon:'🖨️', badge:'sb-printing',   pct:40,  color:'#2563eb' },
+  { key:'slitting',   label:'Slitting',   icon:'✂️', badge:'sb-slitting',   pct:60,  color:'#7c3aed' },
+  { key:'packing',    label:'Packing',    icon:'📦', badge:'sb-packing',    pct:80,  color:'#9333ea' },
+  { key:'ready',      label:'✅ Ready',   icon:'✅', badge:'sb-ready',      pct:100, color:'#16a34a' },
+  { key:'nomaterial', label:'No Material',icon:'⚠️', badge:'sb-nomaterial', pct:5,   color:'#dc2626' },
+];
+const STATUS_IDX = { queue:0, printing:1, slitting:2, packing:3, ready:4, nomaterial:5 };
+
+function getStatus(key) { return STATUSES.find(s=>s.key===key) || STATUSES[0]; }
+
+function sbadge(key) {
+  const s = getStatus(key);
+  return `<span class="sbadge ${s.badge}">${s.icon} ${s.label}</span>`;
+}
+
+function companyBadge(company) {
+  if(!company) return '';
+  const isCL = company==='cups' || company==='cupsandlabels' || company.includes('cups');
+  const isEF = company==='efatoura' || company.includes('fatora') || company==='ef' || company.startsWith('ef_');
+  if(isCL) return '<span class="cbadge cbadge-cl">🔵 Cups &amp; Labels</span>';
+  if(isEF) return '<span class="cbadge cbadge-ef">🔴 Al Fatora</span>';
+  return '<span class="cbadge cbadge-manual">🔧 Manual</span>';
+}
+
+function companyColor(company) {
+  if(!company) return '#64748b';
+  if(company==='cups'||company==='cupsandlabels'||company.includes('cups')) return '#2563eb';
+  if(company==='efatoura'||company==='ef'||company.startsWith('ef')) return '#c0392b';
+  return '#64748b';
+}
+
+// ══════════════════════════════
+// NAV
+// ══════════════════════════════
+function goPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='dashboard') renderDash();
+  if(name==='orders') renderOrdersList();
+  if(name==='import') updateFirebaseStatus();
+}
+
+// ══════════════════════════════
+// DASHBOARD
+// ══════════════════════════════
+function renderDash() {
+  const orders = Object.values(crmOrders);
+  const queue  = orders.filter(o=>!o.status||o.status==='queue').length;
+  const inProd = orders.filter(o=>['printing','slitting','packing'].includes(o.status)).length;
+  const ready  = orders.filter(o=>o.status==='ready').length;
+  const cl     = orders.filter(o=>isClOrder(o)).length;
+  const ef     = orders.filter(o=>isEfOrder(o)).length;
+
+  document.getElementById('s-queue').textContent = queue;
+  document.getElementById('s-prod').textContent  = inProd;
+  document.getElementById('s-ready').textContent = ready;
+  document.getElementById('s-total').textContent = orders.length;
+  document.getElementById('s-cl').textContent    = cl;
+  document.getElementById('s-ef').textContent    = ef;
+
+  // Tag orders with keys for reliable onclick
+  const taggedOrders = Object.entries(crmOrders).map(([k,o])=>({...o,_key:k}));
+  const readyOrders = taggedOrders.filter(o=>o.status==='ready').slice(0,6);
+  document.getElementById('dash-ready').innerHTML = readyOrders.length
+    ? readyOrders.map(o => miniCard(o)).join('')
+    : '<div class="empty" style="padding:20px"><div class="empty-icon">📭</div><div>No orders ready</div></div>';
+
+  const recent = taggedOrders.filter(o=>o.updatedAt).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,5);
+  document.getElementById('dash-recent').innerHTML = recent.length
+    ? recent.map(o => miniCard(o)).join('')
+    : '<div class="empty" style="padding:20px"><div class="empty-icon">📋</div><div>No orders yet</div></div>';
+}
+
+function isClOrder(o) { const c=o.company||''; const k=o._key||''; return c==='cups'||c==='cupsandlabels'||c.includes('cups')||k.startsWith('cups_'); }
+function isEfOrder(o) { const c=o.company||''; const k=o._key||''; return c==='efatoura'||c.includes('fatora')||k.startsWith('efatoura_'); }
+
+function miniCard(o) {
+  const key = getOrderKey(o);
+  const ps = getStatus(o.status);
+  const col = companyColor(o.company);
+  return `<div class="order-card" onclick="openOrderDetail('${key}')">
+    <div class="order-card-stripe" style="background:${col}"></div>
+    <div class="order-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <div>
+          <div class="order-ref">#${o.orderNum||key}</div>
+          <div class="order-customer">${o.customerName||o.customer||'—'}</div>
+          <div class="order-product">${o.product||o.job||'—'}${o.qty?' · Qty: '+o.qty:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          ${sbadge(o.status)}
+          <div style="margin-top:4px">${companyBadge(o.company)}</div>
+        </div>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" style="width:${ps.pct}%;background:${ps.color}"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getOrderKey(o) { return o._key || ''; }
+
+// ══════════════════════════════
+// ORDERS LIST
+// ══════════════════════════════
+let statusFilter = '';
+let compFilter   = '';
+let searchQ      = '';
+
+function renderOrdersList() {
+  buildStatusPills();
+  const entries = Object.entries(crmOrders).map(([k,o])=>({...o,_key:k}));
+  const filtered = entries.filter(o => {
+    if(compFilter==='cl' && !isClOrder(o)) return false;
+    if(compFilter==='ef' && !isEfOrder(o)) return false;
+    if(statusFilter && o.status!==statusFilter) return false;
+    if(searchQ) {
+      const h=(o.customerName+o.orderNum+o.product+o.customer+o.job+'').toLowerCase();
+      if(!h.includes(searchQ.toLowerCase())) return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+
+  document.getElementById('orders-count').textContent = `Showing ${filtered.length} of ${entries.length} orders`;
+  const el = document.getElementById('orders-list');
+  el.innerHTML = filtered.length
+    ? filtered.map(o => miniCard(o)).join('')
+    : '<div class="empty"><div class="empty-icon">📭</div><div>No orders found</div></div>';
+}
+
+function buildStatusPills() {
+  const all = [{key:'',label:'All'},...STATUSES];
+  document.getElementById('status-pills').innerHTML = all.map(s =>
+    `<div class="pill ${statusFilter===s.key?'active':''}" onclick="setStatusFilter('${s.key}',this)">${s.icon||''} ${s.label}</div>`
+  ).join('');
+}
+
+function setStatusFilter(key, el) {
+  statusFilter = key;
+  document.querySelectorAll('#status-pills .pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderOrdersList();
+}
+function setCompFilter(f, el) {
+  compFilter = f;
+  document.querySelectorAll('.pill-row:nth-child(3) .pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderOrdersList();
+}
+function filterOrders(q) { searchQ=q; renderOrdersList(); }
+
+// ══════════════════════════════
+// ORDER DETAIL SHEET
+// ══════════════════════════════
+function openOrderDetail(key) {
+  const o = crmOrders[key];
+  if(!o) { showToast('Order not found'); return; }
+  const ps = getStatus(o.status);
+  const col = companyColor(o.company);
+
+  let html = '';
+
+  // Company + customer header
+  html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+    <div>
+      ${companyBadge(o.company)}
+      <div style="font-size:20px;font-weight:800;color:var(--brand);margin-top:6px">${o.customerName||o.customer||'—'}</div>
+      <div style="font-size:13px;color:var(--muted)">#${o.orderNum||key}</div>
+    </div>
+    <div>${sbadge(o.status)}</div>
+  </div>`;
+
+  // Progress bar + steps
+  html += `<div style="background:var(--surface2);border-radius:10px;padding:12px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:600">
+      <span>${ps.icon} ${ps.label}</span>
+      <span style="color:var(--muted)">${ps.pct}% complete</span>
+    </div>
+    <div class="prog-bar" style="height:10px"><div class="prog-fill" style="width:${ps.pct}%;background:${ps.color}"></div></div>
+  </div>`;
+
+  // Order details
+  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Order Details</div>';
+  const fields = [
+    ['Product / Job', o.product||o.job],
+    ['Quantity',      o.qty],
+    ['Material',      o.material],
+    ['Size',          o.size],
+    ['Winding',       o.winding],
+    ['Colors',        o.colors],
+    ['ETD',           o.etd],
+    ['SO Number',     o.soNumber],
+    ['Company',       o.companyName||o.company],
+    ['Notes',         o.notes],
+  ];
+  html += fields.filter(([,v])=>v).map(([l,v])=>`
+    <div class="drow"><div class="dlabel">${l}</div><div class="dvalue">${v}</div></div>`).join('');
+
+  if(o.prodNotes) html += `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin:10px 0;font-size:13px"><strong>📝 Prod Notes:</strong> ${o.prodNotes}</div>`;
+
+  // UPDATE STATUS SECTION
+  html += '<hr>';
+  html += '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Update Production Status</div>';
+  html += '<div class="status-btn-grid">';
+  STATUSES.forEach(s => {
+    const isCurrent = o.status === s.key;
+    html += `<div class="status-btn ${isCurrent?'active':''}" onclick="updateStatus('${key}','${s.key}',this)">
+      <span class="status-btn-icon">${s.icon}</span>${s.label}
+    </div>`;
+  });
+  html += '</div>';
+
+  // Notes
+  html += `<div class="form-group mt"><label>Production Notes</label>
+    <textarea id="pnotes" placeholder="Notes for sales team…" rows="2" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;outline:none;resize:vertical">${o.prodNotes||''}</textarea>
+  </div>`;
+  html += `<button class="btn btn-green mt" onclick="saveNotes('${key}')">💾 Save Notes</button>`;
+
+  document.getElementById('sheet-title').textContent = `#${o.orderNum||key}`;
+  document.getElementById('sheet-body').innerHTML = html;
+  document.getElementById('sheet-foot').innerHTML = `<button class="btn btn-outline" onclick="closeSheet()">Close</button>`;
+  openSheet();
+}
+
+async function updateStatus(key, status, btn) {
+  document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  btn.style.background = 'var(--brand)';
+  btn.style.color = '#fff';
+  await db.ref(`production/orders/${key}`).update({ status, updatedAt: Date.now() });
+  const s = getStatus(status);
+  showToast(`✓ ${status==='ready'?'Order marked Ready! 🎉':'Status: '+s.label}`);
+}
+
+async function saveNotes(key) {
+  const notes = document.getElementById('pnotes')?.value||'';
+  await db.ref(`production/orders/${key}`).update({ prodNotes:notes, updatedAt:Date.now() });
+  showToast('✓ Notes saved!');
+  const btn = document.querySelector('.btn-green');
+  if(btn){ btn.textContent='✓ Saved!'; setTimeout(()=>btn.textContent='💾 Save Notes',2000); }
+}
+
+// ══════════════════════════════
+// BADGES
+// ══════════════════════════════
+function updateReadyBadge() {
+  const n = Object.values(crmOrders).filter(o=>o.status==='ready').length;
+  const badge = document.getElementById('ready-badge');
+  if(n>0){ badge.textContent=n; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+// ══════════════════════════════
+// IMPORT
+// ══════════════════════════════
+let pendingImport = null;
+
+function dragOver(e){ e.preventDefault(); document.getElementById('import-zone').classList.add('drag'); }
+function dropFile(e){ e.preventDefault(); document.getElementById('import-zone').classList.remove('drag'); handleFileUpload(e.dataTransfer.files[0]); }
+
+function handleFileUpload(file) {
+  if(!file) return;
+  document.getElementById('import-wrap').classList.remove('hidden');
+  document.getElementById('import-summary').classList.add('hidden');
+  document.getElementById('import-fname').textContent = `📄 ${file.name}`;
+  document.getElementById('import-log').innerHTML='';
+  setP(10,'Reading…');
+  ilog('ok','Loaded: '+file.name+' ('+( file.size/1024).toFixed(1)+' KB)');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      setP(30,'Parsing…');
+      const wb = XLSX.read(e.target.result,{type:'array',cellDates:true});
+      ilog('ok','Sheets: '+wb.SheetNames.join(', '));
+      const result={plain:[],printed:[],crvr:[]};
+      wb.SheetNames.forEach(sn=>{
+        const ws=wb.Sheets[sn]; if(!ws)return;
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+        ilog('ok',`"${sn}": ${rows.length} rows`);
+        if(sn.toLowerCase().includes('plain')) parseRows(rows,result.plain);
+        else if(sn.toLowerCase().includes('printed')) parseRows(rows,result.printed);
+        else if(sn.toLowerCase().includes('cr')||sn.toLowerCase().includes('vr')) parseRows(rows,result.crvr);
+      });
+      setP(100,'Done');
+      ilog('ok',`Plain: ${result.plain.length}  Printed: ${result.printed.length}  CR/VR: ${result.crvr.length}`);
+      pendingImport=result;
+      document.getElementById('import-summary').classList.remove('hidden');
+      document.getElementById('import-cards').innerHTML=`
+        <div class="stat-card" style="--sc:var(--accent)"><div class="stat-label">Plain</div><div class="stat-value">${result.plain.length}</div></div>
+        <div class="stat-card" style="--sc:var(--blue)"><div class="stat-label">Printed</div><div class="stat-value">${result.printed.length}</div></div>
+        <div class="stat-card" style="--sc:var(--green)"><div class="stat-label">CR/VR</div><div class="stat-value">${result.crvr.length}</div></div>`;
+    } catch(err){ ilog('err','Error: '+err.message); setP(0,'Failed'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseRows(rows, target) {
+  const hIdx=rows.findIndex(r=>r.some(c=>String(c||'').toLowerCase().includes('customer')));
+  if(hIdx<0) return;
+  const headers=rows[hIdx].map(h=>String(h||'').trim());
+  rows.slice(hIdx+1).forEach(row=>{
+    const o={};headers.forEach((h,i)=>{o[h]=row[i];});
+    const customer=o['Customer']||o['customer'];
+    if(!customer) return;
+    target.push({id:o['Job Order ID']||o['Order ID']||o[0],customer:String(customer),salesman:o['Salesman'],date:fmtDate(o['Date']),job:o['Job Name'],qty:o['Qty/Roll'],price:o['Price'],material:o['Material Type'],size:o['Size (Width x Length)']||o['Size'],machine:o['Machine'],factory:o['Factory'],status:o['Status']||'Under Production'});
+  });
+}
+
+function fmtDate(d){if(!d)return null;if(d instanceof Date)return d.toISOString().slice(0,10);if(typeof d==='string')return d.slice(0,10);if(typeof d==='number'){try{const dt=XLSX.SSF.parse_date_code(d);return dt?`${dt.y}-${String(dt.m).padStart(2,'0')}-${String(dt.d).padStart(2,'0')}`:null;}catch{return null;}}return String(d).slice(0,10);}
+function setP(pct,msg){document.getElementById('import-prog').style.width=pct+'%';document.getElementById('import-status').textContent=msg;}
+function ilog(t,msg){const el=document.getElementById('import-log');const i={ok:'✓',warn:'⚠',err:'✕'};el.innerHTML+=`<div class="l${t}">${i[t]} ${msg}</div>`;el.scrollTop=el.scrollHeight;}
+
+async function commitImport() {
+  if(!pendingImport) return;
+  ilog('ok','Saving to Firebase…');
+  const batch={};
+  pendingImport.plain.forEach(o=>{if(o.id)batch[`plain_orders/${o.id}`]=o;});
+  pendingImport.printed.forEach(o=>{if(o.id)batch[`printed_orders/${o.id}`]=o;});
+  pendingImport.crvr.forEach(o=>{if(o.id)batch[`crvr_orders/${o.id}`]=o;});
+  batch['last_sync']=new Date().toISOString();
+  try{ await db.ref().update(batch); ilog('ok','✓ Saved '+( pendingImport.plain.length+pendingImport.printed.length+pendingImport.crvr.length)+' orders'); showToast('Import complete!'); pendingImport=null; }
+  catch(e){ ilog('err','Error: '+e.message); }
+}
+function resetImport(){pendingImport=null;document.getElementById('import-wrap').classList.add('hidden');document.getElementById('import-summary').classList.add('hidden');}
+
+async function syncFromFirebase() {
+  showToast('Pulling from Firebase…');
+  const snap=await db.ref('/').once('value');
+  const data=snap.val();
+  if(data) showToast('Synced successfully');
+  updateFirebaseStatus();
+}
+
+function updateFirebaseStatus() {
+  const cl=Object.values(crmOrders).filter(o=>isClOrder(o)).length;
+  const ef=Object.values(crmOrders).filter(o=>isEfOrder(o)).length;
+  document.getElementById('firebase-status').innerHTML=`
+    <div>🟢 Firebase: <strong style="color:var(--green)">Connected</strong></div>
+    <div>Total CRM Orders: <strong>${Object.keys(crmOrders).length}</strong></div>
+    <div>🔵 Cups &amp; Labels: <strong>${cl}</strong></div>
+    <div>🔴 Al Fatora: <strong>${ef}</strong></div>`;
+}
+
+// ══════════════════════════════
+// SHEET
+// ══════════════════════════════
+function openSheet(){document.getElementById('sheet-bg').classList.add('open');document.getElementById('sheet').classList.add('open');}
+function closeSheet(){document.getElementById('sheet-bg').classList.remove('open');document.getElementById('sheet').classList.remove('open');}
+let _sy=0;
+document.getElementById('sheet').addEventListener('touchstart',e=>{_sy=e.touches[0].clientY;},{passive:true});
+document.getElementById('sheet').addEventListener('touchmove',e=>{if(e.touches[0].clientY-_sy>80)closeSheet();},{passive:true});
+
+// ══════════════════════════════
+// UTILS
+// ══════════════════════════════
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+</script>
+</body>
+</html>
