@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0e1f3d">
+<title>Production Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#f0f2f7;--surface:#fff;--s2:#f6f8fc;--border:#e2e8f0;
+  --brand:#0e1f3d;--accent:#f0a500;--blue:#2563eb;--green:#16a34a;
+  --red:#dc2626;--purple:#7c3aed;--text:#1e293b;--muted:#64748b;
+  --cl:#2563eb;--ef:#c0392b;
+  --nav:58px;--safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+
+/* LOGIN */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--brand);padding:24px;position:fixed;inset:0;z-index:999}
+.login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:360px}
+.login-logo{text-align:center;font-size:22px;font-weight:800;color:var(--brand);margin-bottom:4px}
+.login-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.login-err{color:var(--red);font-size:13px;margin-bottom:10px;display:none;text-align:center}
+
+/* FORMS */
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.fg input,.fg select,.fg textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--text);background:#fff;outline:none;-webkit-appearance:none;font-family:inherit}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--brand)}
+.fg textarea{resize:vertical;min-height:70px}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* TOPBAR */
+.topbar{background:var(--brand);color:#fff;display:flex;align-items:center;padding:calc(var(--safe-top)+8px) 14px 8px;gap:10px;position:sticky;top:0;z-index:100;min-height:52px}
+.topbar-title{flex:1;font-size:14px;font-weight:700}
+.topbar-title small{display:block;font-size:10px;color:rgba(255,255,255,.5);font-weight:400;margin-top:1px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.user-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;background:var(--accent);cursor:pointer}
+
+/* BOTTOM NAV */
+.botnav{background:var(--brand);display:flex;position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav)+var(--safe-bot));padding-bottom:var(--safe-bot);z-index:100;border-top:1px solid rgba(255,255,255,.1)}
+.bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:rgba(255,255,255,.5);border:none;background:none;padding:6px 0;position:relative;min-height:44px;font-family:inherit}
+.bn.active{color:#fff}
+.bn.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--accent);border-radius:0 0 3px 3px}
+.bn-icon{font-size:20px}
+.bn-label{font-size:10px;font-weight:600}
+.bn-badge{position:absolute;top:4px;right:calc(50% - 20px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center}
+
+/* CONTENT */
+.content{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav)+var(--safe-bot)+8px);min-height:100vh}
+.page{display:none;padding:12px;max-width:560px;margin:0 auto}
+.page.active{display:block}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;border-top:3px solid var(--sc,var(--accent))}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.stat-value{font-size:24px;font-weight:800;color:var(--sc,var(--brand));line-height:1}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* ORDER CARD */
+.order-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.order-card:active{transform:scale(.98)}
+.order-stripe{position:absolute;top:0;left:0;bottom:0;width:4px}
+.order-inner{padding-left:10px}
+
+/* COMPANY BADGE */
+.cbadge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.cb-cl{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
+.cb-ef{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}
+.cb-m{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
+
+/* STATUS BADGE */
+.sbadge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+
+/* PROGRESS */
+.pbar{background:#e2e8f0;border-radius:20px;height:8px;overflow:hidden;margin:8px 0}
+.pbar-fill{height:100%;border-radius:20px;transition:width .5s}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:10px}
+.search-wrap input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface);outline:none}
+.search-wrap input:focus{border-color:var(--brand)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--muted)}
+
+/* FILTER PILLS */
+.pill-row{display:flex;gap:7px;overflow-x:auto;padding:2px 0;margin-bottom:10px;scrollbar-width:none}
+.pill-row::-webkit-scrollbar{display:none}
+.pill{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.pill.active{border-color:var(--brand);background:var(--brand);color:#fff}
+.pill-cl.active{background:var(--cl);border-color:var(--cl);color:#fff}
+.pill-ef.active{background:var(--ef);border-color:var(--ef);color:#fff}
+
+/* ── BOTTOM SHEET ── */
+.sheet-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300}
+.sheet-bg.open{display:block}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;z-index:301;max-height:94vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1)}
+.sheet.open{transform:translateY(0)}
+.sheet-handle{width:44px;height:4px;background:#d1d5db;border-radius:2px;margin:10px auto 0;flex-shrink:0}
+.sheet-hd{padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
+.sheet-title{font-size:16px;font-weight:700;flex:1;padding-right:8px}
+.sheet-body{overflow-y:auto;padding:16px;flex:1;-webkit-overflow-scrolling:touch}
+.sheet-foot{padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;padding-bottom:calc(12px + var(--safe-bot));display:flex;gap:8px}
+
+/* ── STATUS BUTTONS (bigger, 1-per-row) ── */
+.status-btn-list{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.status-btn{width:100%;padding:14px 16px;border-radius:12px;border:2px solid var(--border);background:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left;transition:all .15s;display:flex;align-items:center;gap:12px;font-family:inherit}
+.status-btn:active{transform:scale(.98)}
+.status-btn.active{border-color:var(--brand);background:var(--brand);color:#fff}
+.status-btn-icon{font-size:22px;flex-shrink:0}
+.status-btn-text{flex:1}
+.status-btn-sub{font-size:11px;font-weight:400;opacity:.7;margin-top:1px}
+
+/* DETAIL ROWS */
+.drow{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;gap:10px}
+.drow:last-child{border-bottom:none}
+.dlabel{color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;min-width:80px}
+.dvalue{font-weight:600;text-align:right;color:var(--text);word-break:break-word}
+
+/* JOB ORDER CARD */
+.job-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+.job-card:active{transform:scale(.98);background:var(--s2)}
+.job-num{font-size:11px;font-weight:700;color:var(--muted)}
+.job-cust{font-size:15px;font-weight:700;color:var(--brand);margin:2px 0}
+.job-desc{font-size:12px;color:var(--muted)}
+.job-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:var(--s2);color:var(--muted);border:1px solid var(--border)}
+
+/* MATERIAL SECTION */
+.mat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:8px}
+.mat-row:last-child{border-bottom:none}
+.mat-name{flex:1;font-weight:600}
+.mat-nums{text-align:right;font-size:12px;color:var(--muted)}
+.mat-used{font-weight:700;color:var(--brand)}
+
+/* BUTTONS */
+.btn{padding:12px 18px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;transition:all .15s;font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--brand);color:#fff;flex:1}
+.btn-green{background:var(--green);color:#fff;flex:1}
+.btn-orange{background:var(--accent);color:#000;flex:1}
+.btn-outline{background:#fff;color:var(--brand);border:1.5px solid var(--border);flex:1}
+.btn-danger{background:#fee2e2;color:var(--red);border:1px solid #fca5a5;flex:1}
+.btn-sm{padding:7px 14px;font-size:12px;min-height:36px;border-radius:8px;flex:none}
+.btn-full{width:100%}
+
+/* SECTION HEADER */
+.sec-hd{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;padding-left:2px}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 16px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:10px}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(var(--nav)+var(--safe-bot)+12px);left:50%;transform:translateX(-50%) translateY(10px);background:var(--brand);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* NOTIFICATION BELL */
+.notif-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ef4444}
+
+hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.mt{margin-top:8px}
+.mb{margin-bottom:8px}
+.hidden{display:none!important}
+
+@media(min-width:600px){
+  .botnav,.topbar,.sheet,.sheet-bg{max-width:560px;left:50%;right:auto;width:100%;transform:translateX(-50%)}
+  .botnav{border-radius:16px 16px 0 0}
+  .sheet{transform:translateX(-50%) translateY(100%)}
+  .sheet.open{transform:translateX(-50%) translateY(0)}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-logo">🏭 PRODUCTION PORTAL</div>
+    <div class="login-sub">Cups & Labels · Al Fatora Al Mowahda</div>
+    <div class="fg"><label>Username</label><input id="li-u" placeholder="username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label>Password</label><input id="li-p" type="password" placeholder="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-err" id="li-err">Invalid username or password</div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appWrap" class="hidden">
+<div class="topbar">
+  <div class="topbar-title">🏭 Production Portal<small id="sync-label">Connecting…</small></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="sync-dot" id="sync-dot"></div>
+    <div style="position:relative">
+      <div class="user-av" id="nav-av" onclick="showUserMenu()">P</div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ══ DASHBOARD ══ -->
+<div class="page active" id="page-dashboard">
+  <div class="stats-grid">
+    <div class="stat-card" style="--sc:var(--accent)"><div class="stat-label">Open Jobs</div><div class="stat-value" id="s-open">—</div><div class="stat-sub">In production</div></div>
+    <div class="stat-card" style="--sc:var(--green)"><div class="stat-label">Ready</div><div class="stat-value" id="s-ready">—</div><div class="stat-sub">For delivery</div></div>
+    <div class="stat-card" style="--sc:var(--cl)"><div class="stat-label">Cups & Labels</div><div class="stat-value" id="s-cl">—</div><div class="stat-sub">Active orders</div></div>
+    <div class="stat-card" style="--sc:var(--ef)"><div class="stat-label">Al Fatora</div><div class="stat-value" id="s-ef">—</div><div class="stat-sub">Active orders</div></div>
+  </div>
+  <div class="sec-hd">🔔 Ready for Delivery</div>
+  <div id="dash-ready"></div>
+  <div class="sec-hd">⚡ All Active Jobs</div>
+  <div id="dash-active"></div>
+</div>
+
+<!-- ══ CRM ORDERS ══ -->
+<div class="page" id="page-orders">
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Search orders…" oninput="filterOrders(this.value)"></div>
+  <div class="pill-row" id="status-pills"></div>
+  <div class="pill-row">
+    <div class="pill active" onclick="setComp('',this)">All</div>
+    <div class="pill pill-cl" onclick="setComp('cl',this)">🔵 Cups & Labels</div>
+    <div class="pill pill-ef" onclick="setComp('ef',this)">🔴 Al Fatora</div>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="orders-count"></div>
+  <div id="orders-list"></div>
+</div>
+
+<!-- ══ JOB ORDERS ══ -->
+<div class="page" id="page-jobs">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div><div style="font-size:16px;font-weight:700">Job Orders</div><div style="font-size:12px;color:var(--muted)">Created from CRM orders</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openNewJobSheet()">+ New Job</button>
+  </div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Search job orders…" oninput="filterJobs(this.value)"></div>
+  <div class="pill-row" id="job-status-pills"></div>
+  <div id="jobs-list"></div>
+</div>
+
+<!-- ══ IMPORT ══ -->
+<div class="page" id="page-import">
+  <div style="font-size:16px;font-weight:700;margin-bottom:4px">Import Excel Data</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Upload your Production Excel file — all sheets auto-detected</div>
+
+  <div style="border:2px dashed var(--border);border-radius:14px;padding:32px 16px;text-align:center;cursor:pointer;position:relative;margin-bottom:14px;transition:all .3s" id="import-zone2" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="dropFile2(event)">
+    <input type="file" accept=".xlsx,.xls" onchange="handleExcelImport(this.files[0])" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+    <div style="font-size:36px;margin-bottom:8px">📊</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">Drop Production Excel Here</div>
+    <div style="font-size:12px;color:var(--muted)">Supports: Plain Orders · Printed Orders · CR&VR · Machine Time</div>
+  </div>
+
+  <div id="import-result2" class="hidden">
+    <div class="stats-grid" id="import-stats2"></div>
+    <div id="import-preview2" style="margin-top:10px"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-green" onclick="commitExcelToFirebase()">✓ Save to Firebase</button>
+      <button class="btn btn-outline" onclick="resetImport2()">✕ Cancel</button>
+    </div>
+  </div>
+
+  <hr>
+  <div class="card"><div class="card-title">Firebase Status</div><div id="firebase-status" style="font-size:13px;line-height:2;margin-bottom:12px">Loading…</div><button class="btn btn-primary btn-full mb" onclick="syncFromFirebase()">↓ Pull from Firebase</button></div>
+</div>
+
+</div><!-- /content -->
+
+<div class="botnav">
+  <button class="bn active" onclick="goPage('dashboard',this)"><span class="bn-icon">📊</span><span class="bn-label">Dashboard</span></button>
+  <button class="bn" onclick="goPage('orders',this)"><span class="bn-icon">📦</span><span class="bn-label">CRM Orders</span><span class="bn-badge hidden" id="ready-badge">0</span></button>
+  <button class="bn" onclick="goPage('jobs',this)"><span class="bn-icon">🏭</span><span class="bn-label">Job Orders</span></button>
+  <button class="bn" onclick="goPage('import',this)"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
+</div>
+</div><!-- /appWrap -->
+
+<!-- SHEET -->
+<div class="sheet-bg" id="sheet-bg"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-hd">
+    <div class="sheet-title" id="sheet-title">Details</div>
+    <button onclick="closeSheet()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);padding:4px;flex-shrink:0">✕</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+  <div class="sheet-foot" id="sheet-foot"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const firebase_config = { databaseURL:"https://cups-and-labels-default-rtdb.firebaseio.com" };
+firebase.initializeApp(firebase_config);
+const db = firebase.database();
+
+// ══ USERS ══
+const USERS = {
+  prod_admin:  {pass:'prod123', name:'Production Admin', role:'admin',    av:'PA'},
+  operator1:   {pass:'op123',   name:'Operator 1',       role:'operator', av:'O1'},
+  operator2:   {pass:'op456',   name:'Operator 2',       role:'operator', av:'O2'},
+  supervisor1: {pass:'sup123',  name:'Supervisor',       role:'admin',    av:'SV'},
+};
+let CU = null;
+
+function doLogin(){
+  const u=(document.getElementById('li-u').value||'').trim().toLowerCase();
+  const p=(document.getElementById('li-p').value||'').trim();
+  const err=document.getElementById('li-err');
+  err.style.display='none';
+  if(!u||!p){err.style.display='block';err.textContent='Enter username and password';return;}
+  const user=USERS[u];
+  if(!user||user.pass!==p){err.style.display='block';err.textContent='Invalid username or password';return;}
+  CU={id:u,...user};
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('appWrap').classList.remove('hidden');
+  document.getElementById('nav-av').textContent=CU.av;
+  initFirebase();
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginWrap').style.display!=='none')doLogin();});
+
+function doLogout(){
+  CU=null;
+  document.getElementById('loginWrap').style.display='flex';
+  document.getElementById('appWrap').classList.add('hidden');
+  document.getElementById('li-u').value='';
+  document.getElementById('li-p').value='';
+  closeSheet();
+}
+function showUserMenu(){
+  openSheet('Signed in as '+CU.name,
+    `<div class="drow"><div class="dlabel">Username</div><div class="dvalue">${CU.id}</div></div>
+     <div class="drow"><div class="dlabel">Role</div><div class="dvalue">${CU.role}</div></div>`,
+    `<button class="btn btn-danger" onclick="doLogout();closeSheet()">🚪 Sign Out</button>`
+  );
+}
+
+// ══ PRODUCTION STAGES (9) ══
+const STAGES = [
+  {key:'order_received',  label:'Order Received',   icon:'📋', color:'#475569', bg:'#f1f5f9', pct:10},
+  {key:'under_design',    label:'Under Design',      icon:'🎨', color:'#7c3aed', bg:'#f5f3ff', pct:22},
+  {key:'design_approval', label:'Design Approval',   icon:'👁️', color:'#d97706', bg:'#fff7ed', pct:33},
+  {key:'no_material',     label:'No Material',       icon:'⚠️', color:'#dc2626', bg:'#fef2f2', pct:33},
+  {key:'printing',        label:'Printing',          icon:'🖨️', color:'#1d4ed8', bg:'#dbeafe', pct:50},
+  {key:'die_cutting',     label:'Die Cutting',       icon:'✂️', color:'#0891b2', bg:'#ecfeff', pct:65},
+  {key:'slitting',        label:'Slitting',          icon:'🔧', color:'#059669', bg:'#d1fae5', pct:78},
+  {key:'packing',         label:'Packing',           icon:'📦', color:'#9333ea', bg:'#fdf4ff', pct:90},
+  {key:'ready',           label:'Ready for Delivery',icon:'✅', color:'#16a34a', bg:'#dcfce7', pct:100},
+];
+
+function getStage(key){return STAGES.find(s=>s.key===key)||STAGES[0];}
+function stageBadge(key){
+  const s=getStage(key);
+  return `<span class="sbadge" style="background:${s.bg};color:${s.color}">${s.icon} ${s.label}</span>`;
+}
+function compBadge(company){
+  const isCL=company==='cups'||company==='cupsandlabels'||(company||'').includes('cups');
+  const isEF=company==='efatoura'||(company||'').includes('ef');
+  if(isCL) return '<span class="cbadge cb-cl">🔵 Cups &amp; Labels</span>';
+  if(isEF) return '<span class="cbadge cb-ef">🔴 Al Fatora</span>';
+  return '<span class="cbadge cb-m">🔧 Manual</span>';
+}
+function compColor(company){
+  if((company||'').includes('cups')||company==='cups') return '#2563eb';
+  if((company||'').includes('ef')||company==='efatoura') return '#c0392b';
+  return '#64748b';
+}
+function isCL(o){const c=o.company||'';return c==='cups'||c==='cupsandlabels'||c.includes('cups');}
+function isEF(o){const c=o.company||'';return c==='efatoura'||c.includes('ef');}
+
+// ══ STATE ══
+let crmOrders={};
+let jobOrders={};
+let statusFilter='';
+let compFilter='';
+let jobStatusFilter='';
+let searchQ='';
+
+// ══ FIREBASE ══
+function initFirebase(){
+  db.ref('.info/connected').on('value',snap=>{
+    const ok=snap.val();
+    document.getElementById('sync-dot').style.background=ok?'#22c55e':'#ef4444';
+    document.getElementById('sync-label').textContent=ok?'Live · Firebase':'Reconnecting…';
+  });
+  db.ref('production/orders').on('value',snap=>{
+    crmOrders=snap.val()||{};
+    renderDash(); renderOrdersList(); updateReadyBadge(); updateFirebaseStatus();
+  });
+  db.ref('job_orders').on('value',snap=>{
+    jobOrders=snap.val()||{};
+    renderJobsList(); renderJobStatusPills();
+  });
+}
+
+// ══ NAV ══
+function goPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(name==='import')updateFirebaseStatus();
+}
+
+// ══ DASHBOARD ══
+function renderDash(){
+  const orders=Object.values(crmOrders);
+  const jobs=Object.values(jobOrders);
+  const allActive=[...orders,...jobs];
+  const open=allActive.filter(o=>o.status&&o.status!=='ready').length;
+  const ready=allActive.filter(o=>o.status==='ready').length;
+  const cl=allActive.filter(o=>isCL(o)).length;
+  const ef=allActive.filter(o=>isEF(o)).length;
+  document.getElementById('s-open').textContent=open;
+  document.getElementById('s-ready').textContent=ready;
+  document.getElementById('s-cl').textContent=cl;
+  document.getElementById('s-ef').textContent=ef;
+
+  const readyItems=allActive.filter(o=>o.status==='ready').slice(0,6);
+  document.getElementById('dash-ready').innerHTML=readyItems.length
+    ?readyItems.map(o=>miniCard(o)).join('')
+    :'<div class="empty" style="padding:20px"><div class="empty-icon">📭</div><div>No orders ready</div></div>';
+
+  const active=allActive.filter(o=>o.status&&o.status!=='ready')
+    .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,10);
+  document.getElementById('dash-active').innerHTML=active.length
+    ?active.map(o=>miniCard(o)).join('')
+    :'<div class="empty" style="padding:20px"><div class="empty-icon">📋</div><div>No active jobs yet</div></div>';
+}
+
+function miniCard(o){
+  const key=Object.keys(crmOrders).find(k=>crmOrders[k]===o)||Object.keys(jobOrders).find(k=>jobOrders[k]===o)||'';
+  const isJob=!!jobOrders[key];
+  const s=getStage(o.status||o.prodStatus||'order_received');
+  const col=compColor(o.company);
+  const etdHtml=o.etd?`<span style="font-size:10px;color:${new Date(o.etd)<new Date()?'#dc2626':'#059669'}">📅 ETD: ${o.etd}</span>`:'';
+  return `<div class="order-card" onclick="${isJob?'openJobDetail':'openOrderDetail'}('${key}')">
+    <div class="order-stripe" style="background:${col}"></div>
+    <div class="order-inner">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);display:flex;gap:6px;align-items:center">
+            ${isJob?'<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:10px;font-size:10px">JO</span>':''} #${o.orderNum||o.jobOrderNum||key}
+          </div>
+          <div style="font-size:15px;font-weight:700;color:var(--brand);margin:2px 0">${o.customerName||o.customer||'—'}</div>
+          <div style="font-size:12px;color:var(--muted)">${o.product||o.jobName||o.job||'—'}${o.qty?' · '+o.qty+' rolls':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          ${stageBadge(o.status||o.prodStatus||'order_received')}
+          <div style="margin-top:4px">${compBadge(o.company)}</div>
+        </div>
+      </div>
+      <div class="pbar"><div class="pbar-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px">
+        <span>${s.icon} ${s.label}</span>${etdHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══ ORDERS LIST ══
+function renderOrdersList(){
+  buildStatusPills();
+  const entries=Object.entries(crmOrders).map(([k,o])=>({...o,_key:k}));
+  const filtered=entries.filter(o=>{
+    if(compFilter==='cl'&&!isCL(o))return false;
+    if(compFilter==='ef'&&!isEF(o))return false;
+    if(statusFilter&&(o.status||'order_received')!==statusFilter)return false;
+    if(searchQ){const h=((o.customerName||'')+(o.orderNum||'')+(o.product||'')+(o.customer||'')+(o.job||'')).toLowerCase();if(!h.includes(searchQ))return false;}
+    return true;
+  }).sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+  document.getElementById('orders-count').textContent=`Showing ${filtered.length} of ${entries.length} orders`;
+  document.getElementById('orders-list').innerHTML=filtered.length
+    ?filtered.map(o=>miniCard(o)).join('')
+    :'<div class="empty"><div class="empty-icon">📭</div><div>No orders found</div></div>';
+}
+
+function buildStatusPills(){
+  const all=[{key:'',label:'All',icon:''},...STAGES];
+  document.getElementById('status-pills').innerHTML=all.map(s=>
+    `<div class="pill ${statusFilter===s.key?'active':''}" onclick="setSF('${s.key}',this)">${s.icon||''} ${s.label}</div>`
+  ).join('');
+}
+function setSF(k,el){statusFilter=k;document.querySelectorAll('#status-pills .pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');renderOrdersList();}
+function setComp(f,el){compFilter=f;document.querySelectorAll('.pill-cl,.pill-ef,.pill-row .pill:first-child').forEach(p=>p.classList.remove('active'));el.classList.add('active');renderOrdersList();}
+function filterOrders(q){searchQ=q.toLowerCase();renderOrdersList();}
+
+// ══ ORDER DETAIL SHEET ══
+function openOrderDetail(key){
+  const o=crmOrders[key];
+  if(!o){showToast('Order not found');return;}
+  const s=getStage(o.status||'order_received');
+  const col=compColor(o.company);
+
+  let html=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>${compBadge(o.company)}<div style="font-size:20px;font-weight:800;color:var(--brand);margin-top:6px">${o.customerName||o.customer||'—'}</div><div style="font-size:13px;color:var(--muted)">#${o.orderNum||key}</div></div>
+      <div>${stageBadge(o.status||'order_received')}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:600"><span>${s.icon} ${s.label}</span><span style="color:var(--muted)">${s.pct}%</span></div>
+      <div class="pbar" style="height:10px"><div class="pbar-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+    </div>`;
+
+  // Details
+  [['Product',o.product||o.job],['Quantity',o.qty],['Material',o.material],['Size',o.size],
+   ['Winding',o.winding],['Core',o.core],['Colors',o.colors],['ETD',o.etd],
+   ['SO Number',o.soNumber],['Notes',o.notes]
+  ].filter(([,v])=>v).forEach(([l,v])=>{
+    html+=`<div class="drow"><div class="dlabel">${l}</div><div class="dvalue">${v}</div></div>`;
+  });
+
+  if(o.prodNotes) html+=`<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px;margin:10px 0;font-size:13px"><strong>📝 Prod Notes:</strong> ${o.prodNotes}</div>`;
+
+  // Convert to Job Order button
+  html+=`<hr><button class="btn btn-orange btn-full mb" onclick="convertToJobOrder('${key}')">📋 Convert to Job Order</button>`;
+
+  // Update status
+  html+=`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Update Production Status</div>`;
+  html+=`<div class="status-btn-list">`;
+  STAGES.forEach(st=>{
+    const cur=(o.status||'order_received')===st.key;
+    html+=`<button class="status-btn ${cur?'active':''}" onclick="updateCRMStatus('${key}','${st.key}',this)" style="${cur?'':''}">
+      <span class="status-btn-icon">${st.icon}</span>
+      <div class="status-btn-text"><div>${st.label}</div></div>
+      ${cur?'<span style="font-size:12px;opacity:.8">✓ Current</span>':''}
+    </button>`;
+  });
+  html+=`</div>`;
+
+  html+=`<div class="fg mt"><label>Production Notes</label><textarea id="pnotes" rows="2" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;outline:none;resize:vertical;font-family:inherit">${o.prodNotes||''}</textarea></div>`;
+  html+=`<button class="btn btn-green btn-full mt" onclick="saveProdNotes('${key}')">💾 Save Notes</button>`;
+
+  document.getElementById('sheet-title').textContent=`#${o.orderNum||key}`;
+  document.getElementById('sheet-body').innerHTML=html;
+  document.getElementById('sheet-foot').innerHTML=`<button class="btn btn-outline" onclick="closeSheet()">Close</button>`;
+  openSheet();
+}
+
+async function updateCRMStatus(key,status,btn){
+  document.querySelectorAll('.status-btn').forEach(b=>{b.classList.remove('active');b.innerHTML=b.innerHTML.replace('<span style="font-size:12px;opacity:.8">✓ Current</span>','');});
+  btn.classList.add('active');
+  btn.innerHTML+=`<span style="font-size:12px;opacity:.8">✓ Current</span>`;
+  await db.ref(`production/orders/${key}`).update({status,updatedAt:Date.now()});
+  showToast(`✓ ${getStage(status).label}`);
+}
+async function saveProdNotes(key){
+  const notes=document.getElementById('pnotes')?.value||'';
+  await db.ref(`production/orders/${key}`).update({prodNotes:notes,updatedAt:Date.now()});
+  showToast('Notes saved!');
+}
+
+// ══ CONVERT CRM ORDER → JOB ORDER ══
+async function convertToJobOrder(crmKey){
+  const o=crmOrders[crmKey];
+  if(!o){showToast('Order not found');return;}
+  const now=new Date();
+  const seq=Object.keys(jobOrders).length+1;
+  const jobNum=`JO-${now.getFullYear()}-${String(seq).padStart(4,'0')}`;
+  if(Object.values(jobOrders).find(j=>j.crmKey===crmKey)){
+    showToast('Already converted to Job Order');return;
+  }
+  const job={
+    jobOrderNum:jobNum,crmKey,
+    company:o.company,companyName:o.companyName,
+    customer:o.customerName||o.customer,
+    orderNum:o.orderNum,soNumber:o.soNumber,poNumber:o.poNumber,
+    product:o.product||o.job,material:o.material,size:o.size,
+    qty:o.qty,core:o.core,winding:o.winding,colors:o.colors,
+    etd:o.etd,notes:o.notes,
+    status:'order_received',
+    materialsNeeded:[],materialsUsed:[],
+    qtyProduced:0,
+    createdAt:Date.now(),updatedAt:Date.now(),
+    createdBy:CU.id,
+  };
+  await db.ref(`job_orders/${jobNum}`).set(job);
+  showToast(`✅ Job Order ${jobNum} created!`);
+  closeSheet();
+  goPage('jobs',document.getElementById('bn-jobs')||null);
+  setTimeout(()=>openJobDetail(jobNum),400);
+}
+
+// ══ JOB ORDERS LIST ══
+function renderJobsList(query=''){
+  renderJobStatusPills();
+  const q=(query||document.querySelector('#page-jobs .search-wrap input')?.value||'').toLowerCase();
+  const jobs=Object.entries(jobOrders).map(([k,j])=>({...j,_key:k}))
+    .filter(j=>{
+      if(jobStatusFilter&&(j.status||'order_received')!==jobStatusFilter)return false;
+      if(q&&!((j.customer+j.jobOrderNum+j.product+j.orderNum+'').toLowerCase()).includes(q))return false;
+      return true;
+    })
+    .sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+
+  const el=document.getElementById('jobs-list');
+  el.innerHTML=jobs.length?jobs.map(j=>{
+    const s=getStage(j.status||'order_received');
+    const col=compColor(j.company);
+    const etdHtml=j.etd?`<span style="font-size:10px;color:${new Date(j.etd)<new Date()?'#dc2626':'#059669'}">📅 ${j.etd}</span>`:'';
+    return `<div class="job-card" onclick="openJobDetail('${j._key}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="flex:1">
+          <div class="job-num">${j.jobOrderNum||j._key} ${compBadge(j.company)}</div>
+          <div class="job-cust">${j.customer||'—'}</div>
+          <div class="job-desc">${j.product||'—'}${j.qty?' · '+j.qty+' rolls':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">${stageBadge(j.status||'order_received')}</div>
+      </div>
+      <div class="pbar"><div class="pbar-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px">
+        <div class="job-tags">
+          ${j.material?`<span class="tag">${j.material}</span>`:''}
+          ${j.size?`<span class="tag">${j.size}</span>`:''}
+          ${j.core?`<span class="tag">Core ${j.core}</span>`:''}
+        </div>
+        ${etdHtml}
+      </div>
+    </div>`;
+  }).join(''):'<div class="empty"><div class="empty-icon">🏭</div><div>No job orders yet</div></div>';
+}
+
+function renderJobStatusPills(){
+  const el=document.getElementById('job-status-pills');
+  if(!el)return;
+  const all=[{key:'',label:'All',icon:''},...STAGES];
+  el.innerHTML=all.map(s=>`<div class="pill ${jobStatusFilter===s.key?'active':''}" onclick="setJSF('${s.key}',this)">${s.icon||''} ${s.label}</div>`).join('');
+}
+function setJSF(k,el){jobStatusFilter=k;document.querySelectorAll('#job-status-pills .pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');renderJobsList();}
+function filterJobs(q){renderJobsList(q);}
+
+// ══ JOB ORDER DETAIL ══
+function openJobDetail(key){
+  const j=jobOrders[key];
+  if(!j){showToast('Job not found');return;}
+  const s=getStage(j.status||'order_received');
+  const materialsNeeded=j.materialsNeeded||[];
+  const materialsUsed=j.materialsUsed||[];
+
+  let html=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>${compBadge(j.company)}<div style="font-size:18px;font-weight:800;color:var(--brand);margin-top:6px">${j.customer||'—'}</div><div style="font-size:13px;color:var(--muted)">${j.jobOrderNum||key}</div>${j.orderNum?`<div style="font-size:12px;color:var(--muted)">CRM: #${j.orderNum}</div>`:''}</div>
+      <div>${stageBadge(j.status||'order_received')}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;font-weight:600"><span>${s.icon} ${s.label}</span><span style="color:var(--muted)">${s.pct}%</span></div>
+      <div class="pbar" style="height:10px"><div class="pbar-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+    </div>`;
+
+  // Order details
+  html+=`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Job Details</div>`;
+  [['SO Number',j.soNumber],['PO Number',j.poNumber],['Product',j.product],
+   ['Quantity',j.qty?j.qty+' rolls':''],['Material',j.material],['Size',j.size],
+   ['Core',j.core],['Winding',j.winding],['Colors',j.colors],['ETD',j.etd],
+   ['Produced Qty',j.qtyProduced?j.qtyProduced+' rolls':''],['Notes',j.notes]
+  ].filter(([,v])=>v).forEach(([l,v])=>{
+    html+=`<div class="drow"><div class="dlabel">${l}</div><div class="dvalue">${v}</div></div>`;
+  });
+
+  // Materials needed
+  html+=`<hr><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Materials Needed</div>
+    <button class="btn btn-primary btn-sm" onclick="openAddMaterialSheet('${key}','needed')">+ Add</button>
+  </div>`;
+  if(materialsNeeded.length){
+    html+=materialsNeeded.map((m,i)=>`
+      <div class="mat-row">
+        <div><div class="mat-name">${m.name}</div><div style="font-size:11px;color:var(--muted)">${m.type||''}</div></div>
+        <div class="mat-nums"><div class="mat-used">${m.qty} ${m.unit||''}</div></div>
+      </div>`).join('');
+  } else {
+    html+=`<div style="color:var(--muted);font-size:13px;padding:8px 0">No materials added yet</div>`;
+  }
+
+  // Materials used / actual
+  html+=`<hr><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Materials Used (Actual)</div>
+    <button class="btn btn-primary btn-sm" onclick="openAddMaterialSheet('${key}','used')">+ Add</button>
+  </div>`;
+  if(materialsUsed.length){
+    html+=materialsUsed.map((m,i)=>`
+      <div class="mat-row">
+        <div><div class="mat-name">${m.name}</div><div style="font-size:11px;color:var(--muted)">${m.type||''} · ${m.date||''}</div></div>
+        <div class="mat-nums"><div class="mat-used">${m.qty} ${m.unit||''}</div></div>
+      </div>`).join('');
+  } else {
+    html+=`<div style="color:var(--muted);font-size:13px;padding:8px 0">No actual usage recorded yet</div>`;
+  }
+
+  // Qty produced
+  html+=`<hr><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Actual Qty Produced</div>
+    <div class="fg"><input type="number" id="qty-produced" value="${j.qtyProduced||''}" placeholder="Enter actual qty produced…"></div>
+    <button class="btn btn-green btn-full mb" onclick="saveQtyProduced('${key}')">💾 Save Qty Produced</button>`;
+
+  // Update status
+  html+=`<hr><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Update Production Status</div>`;
+  html+=`<div class="status-btn-list">`;
+  STAGES.forEach(st=>{
+    const cur=(j.status||'order_received')===st.key;
+    html+=`<button class="status-btn ${cur?'active':''}" onclick="updateJobStatus('${key}','${st.key}',this)">
+      <span class="status-btn-icon">${st.icon}</span>
+      <div class="status-btn-text"><div>${st.label}</div></div>
+      ${cur?'<span style="font-size:12px;opacity:.8">✓ Current</span>':''}
+    </button>`;
+  });
+  html+=`</div>`;
+
+  // Notes
+  html+=`<div class="fg mt"><label>Production Notes</label><textarea id="job-notes" rows="2" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;outline:none;resize:vertical;font-family:inherit">${j.prodNotes||''}</textarea></div>`;
+  html+=`<button class="btn btn-green btn-full mt" onclick="saveJobNotes('${key}')">💾 Save Notes</button>`;
+
+  document.getElementById('sheet-title').textContent=j.jobOrderNum||key;
+  document.getElementById('sheet-body').innerHTML=html;
+  document.getElementById('sheet-foot').innerHTML=`<button class="btn btn-outline" onclick="closeSheet()">Close</button>`;
+  openSheet();
+}
+
+async function updateJobStatus(key,status,btn){
+  document.querySelectorAll('.status-btn').forEach(b=>{b.classList.remove('active');const sp=b.querySelector('span:last-child');if(sp&&sp.textContent.includes('Current'))sp.remove();});
+  btn.classList.add('active');
+  await db.ref(`job_orders/${key}`).update({status,updatedAt:Date.now()});
+  // Also update linked CRM order if exists
+  const j=jobOrders[key];
+  if(j&&j.crmKey&&crmOrders[j.crmKey]){
+    await db.ref(`production/orders/${j.crmKey}`).update({status,updatedAt:Date.now()});
+  }
+  showToast(`✓ ${getStage(status).label}`);
+}
+
+async function saveJobNotes(key){
+  const notes=document.getElementById('job-notes')?.value||'';
+  await db.ref(`job_orders/${key}`).update({prodNotes:notes,updatedAt:Date.now()});
+  showToast('Notes saved!');
+}
+
+async function saveQtyProduced(key){
+  const qty=parseInt(document.getElementById('qty-produced')?.value)||0;
+  await db.ref(`job_orders/${key}`).update({qtyProduced:qty,updatedAt:Date.now()});
+  showToast(`✓ Qty produced: ${qty} rolls`);
+}
+
+// ══ ADD MATERIAL SHEET ══
+function openAddMaterialSheet(jobKey,type){
+  const title=type==='needed'?'Add Material Needed':'Add Material Used';
+  const html=`
+    <div class="fg"><label>Material Name</label><input id="mat-name" placeholder="e.g. White PP 80gsm, DTL…"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Quantity</label><input type="number" id="mat-qty" placeholder="e.g. 500"></div>
+      <div class="fg"><label>Unit</label><select id="mat-unit"><option>kg</option><option>rolls</option><option>meters</option><option>sheets</option><option>pcs</option><option>boxes</option></select></div>
+    </div>
+    <div class="fg"><label>Type / Category</label><select id="mat-type"><option value="">Select…</option><option>Paper / Sticker</option><option>Ink</option><option>Core</option><option>Box</option><option>Tape</option><option>Other Consumable</option></select></div>
+    <div class="fg"><label>Date</label><input type="date" id="mat-date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="fg"><label>Notes</label><input id="mat-notes" placeholder="Optional notes…"></div>`;
+
+  document.getElementById('sheet-title').textContent=title;
+  document.getElementById('sheet-body').innerHTML=html;
+  document.getElementById('sheet-foot').innerHTML=`
+    <button class="btn btn-green" onclick="saveMaterial('${jobKey}','${type}')">✓ Save Material</button>
+    <button class="btn btn-outline" onclick="openJobDetail('${jobKey}')">Cancel</button>`;
+  // sheet already open
+}
+
+async function saveMaterial(jobKey,type){
+  const name=document.getElementById('mat-name')?.value?.trim();
+  const qty=parseFloat(document.getElementById('mat-qty')?.value)||0;
+  const unit=document.getElementById('mat-unit')?.value||'';
+  const mtype=document.getElementById('mat-type')?.value||'';
+  const date=document.getElementById('mat-date')?.value||'';
+  const notes=document.getElementById('mat-notes')?.value||'';
+  if(!name||!qty){showToast('Enter material name and quantity');return;}
+  const entry={name,qty,unit,type:mtype,date,notes,addedBy:CU.id,addedAt:Date.now()};
+  const j=jobOrders[jobKey];
+  if(!j)return;
+  const field=type==='needed'?'materialsNeeded':'materialsUsed';
+  const arr=j[field]||[];
+  arr.push(entry);
+  await db.ref(`job_orders/${jobKey}/${field}`).set(arr);
+  await db.ref(`job_orders/${jobKey}`).update({updatedAt:Date.now()});
+  showToast(`✓ Material ${type==='needed'?'added to plan':'usage recorded'}`);
+  setTimeout(()=>openJobDetail(jobKey),300);
+}
+
+// ══ NEW JOB ORDER (manual) ══
+let _jobSeq=1000;
+function openNewJobSheet(){
+  _jobSeq++;
+  const now=new Date();
+  const jobNum=`JO-${now.getFullYear()}-${String(_jobSeq).padStart(4,'0')}`;
+  const html=`
+    <div class="fg-row">
+      <div class="fg"><label>Job Order #</label><input id="nj-num" value="${jobNum}" readonly style="color:var(--muted)"></div>
+      <div class="fg"><label>Company</label><select id="nj-comp"><option value="cups">🔵 Cups & Labels</option><option value="efatoura">🔴 Al Fatora</option></select></div>
+    </div>
+    <div class="fg"><label>Customer Name *</label><input id="nj-cust" placeholder="Customer name…"></div>
+    <div class="fg-row">
+      <div class="fg"><label>SO Number</label><input id="nj-so" placeholder="Sales Order #"></div>
+      <div class="fg"><label>PO Number</label><input id="nj-po" placeholder="PO #"></div>
+    </div>
+    <div class="fg"><label>Product / Job Name</label><input id="nj-prod" placeholder="e.g. Price Label"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Qty (Rolls)</label><input type="number" id="nj-qty" placeholder="e.g. 500"></div>
+      <div class="fg"><label>ETD</label><input type="date" id="nj-etd" value="${now.toISOString().slice(0,10)}"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Material</label><input id="nj-mat" placeholder="e.g. DTL, PP Matt"></div>
+      <div class="fg"><label>Size (W×L)</label><input id="nj-size" placeholder="e.g. 100×50mm"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Core</label><select id="nj-core"><option>40mm</option><option>76mm</option><option>25mm</option></select></div>
+      <div class="fg"><label>Colors</label><input id="nj-colors" placeholder="e.g. 4 colors"></div>
+    </div>
+    <div class="fg"><label>Notes / Instructions</label><textarea id="nj-notes" rows="2" placeholder="Special instructions…"></textarea></div>`;
+  document.getElementById('sheet-title').textContent='New Job Order';
+  document.getElementById('sheet-body').innerHTML=html;
+  document.getElementById('sheet-foot').innerHTML=`<button class="btn btn-green" onclick="submitNewJob()">✓ Create Job Order</button><button class="btn btn-outline" onclick="closeSheet()">Cancel</button>`;
+  openSheet();
+}
+
+async function submitNewJob(){
+  const cust=document.getElementById('nj-cust')?.value?.trim();
+  if(!cust){showToast('Customer name required');return;}
+  const num=document.getElementById('nj-num')?.value;
+  const job={
+    jobOrderNum:num,
+    company:document.getElementById('nj-comp')?.value,
+    customer:cust,
+    soNumber:document.getElementById('nj-so')?.value||'',
+    poNumber:document.getElementById('nj-po')?.value||'',
+    product:document.getElementById('nj-prod')?.value||'',
+    qty:document.getElementById('nj-qty')?.value||'',
+    etd:document.getElementById('nj-etd')?.value||'',
+    material:document.getElementById('nj-mat')?.value||'',
+    size:document.getElementById('nj-size')?.value||'',
+    core:document.getElementById('nj-core')?.value||'',
+    colors:document.getElementById('nj-colors')?.value||'',
+    notes:document.getElementById('nj-notes')?.value||'',
+    status:'order_received',
+    materialsNeeded:[],materialsUsed:[],qtyProduced:0,
+    createdAt:Date.now(),updatedAt:Date.now(),createdBy:CU.id,
+  };
+  await db.ref(`job_orders/${num}`).set(job);
+  showToast(`✅ Job Order ${num} created!`);
+  closeSheet();
+}
+
+// ══ BADGES ══
+function updateReadyBadge(){
+  const all=[...Object.values(crmOrders),...Object.values(jobOrders)];
+  const n=all.filter(o=>o.status==='ready').length;
+  const badge=document.getElementById('ready-badge');
+  if(n>0){badge.textContent=n;badge.classList.remove('hidden');}
+  else badge.classList.add('hidden');
+}
+
+// ══ FIREBASE ══
+async function syncFromFirebase(){
+  showToast('Pulling from Firebase…');
+  const snap=await db.ref('/').once('value');
+  if(snap.val()) showToast('Synced!');
+  updateFirebaseStatus();
+}
+function updateFirebaseStatus(){
+  const cl=Object.values(crmOrders).filter(o=>isCL(o)).length;
+  const ef=Object.values(crmOrders).filter(o=>isEF(o)).length;
+  const jobs=Object.keys(jobOrders).length;
+  document.getElementById('firebase-status').innerHTML=`
+    <div>🟢 Firebase: <strong style="color:var(--green)">Connected</strong></div>
+    <div>CRM Orders: <strong>${Object.keys(crmOrders).length}</strong> (🔵 ${cl} · 🔴 ${ef})</div>
+    <div>Job Orders: <strong>${jobs}</strong></div>
+    <div>User: <strong>${CU?.name||'—'}</strong> (${CU?.role||'—'})</div>`;
+}
+
+// ══ SHEET ══
+function openSheet(){document.getElementById('sheet-bg').classList.add('open');document.getElementById('sheet').classList.add('open');}
+function closeSheet(){document.getElementById('sheet-bg').classList.remove('open');document.getElementById('sheet').classList.remove('open');}
+
+// ══ UTILS ══
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+// ══ EXCEL IMPORT ══
+let _pendingExcel = null;
+function dropFile2(e){e.preventDefault();document.getElementById('import-zone2').style.borderColor='var(--border)';handleExcelImport(e.dataTransfer.files[0]);}
+
+function handleExcelImport(file){
+  if(!file)return;
+  showToast('Reading Excel…');
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const XLSX=window.XLSX;
+      if(!XLSX){showToast('XLSX library not loaded');return;}
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:false});
+      const result={plain:[],printed:[],crvr:[]};
+      wb.SheetNames.forEach(sn=>{
+        const ws=wb.Sheets[sn];
+        const snl=sn.toLowerCase();
+        if(snl.includes('plain'))parseExcelSheet(ws,result.plain,'plain');
+        else if(snl.includes('print'))parseExcelSheet(ws,result.printed,'printed');
+        else if(snl.includes('cr')||snl.includes('vr'))parseExcelSheet(ws,result.crvr,'crvr');
+      });
+      _pendingExcel=result;
+      showImportResult2(result);
+    }catch(err){showToast('Error: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseExcelSheet(ws,target,type){
+  const XLSX=window.XLSX;
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+  let hIdx=-1;
+  for(let i=0;i<Math.min(10,rows.length);i++){
+    if((rows[i]||[]).filter(v=>v!=null&&String(v).trim()).length>=4){hIdx=i;break;}
+  }
+  if(hIdx<0)return;
+  const headers=rows[hIdx].map(h=>String(h||'').trim());
+  rows.slice(hIdx+1).forEach(row=>{
+    const first=row[0]||row[1];
+    if(first==null||String(first).trim()==='')return;
+    const o={};
+    headers.forEach((h,i)=>{if(h&&i<row.length)o[h]=row[i];});
+    const norm={
+      id:String(o['Order ID']||o['Product ID']||row[0]||''),
+      customer:o['Customer']||o['customer']||'',
+      salesman:o['Salesman']||'',
+      date:String(o['Date']||'').slice(0,10),
+      jobName:o['Job Name']||'',
+      qty:o['Qty/Roll']||'',
+      price:o['Price']||'',
+      material:o['Material Type']||'',
+      materialOrigin:o['Material Origin']||'',
+      size:o['Size (Width x Length)']||o['Size']||'',
+      lpr:o['Label Per Rolls']||'',
+      core:o['Core']||o['Core Size']||'',
+      status:o['Status']||o['Status of Job']||'Done',
+      factory:o['Factory']||'',
+      machine:o['Machine']||'',
+      deliveredQty:o['Delivered Qty']||'',
+      stock:o['Stock']||'',
+      materialSupplier:o['Material Supplier Name']||'',
+      rawMaterialSize:o['Raw Material Size']||'',
+      cliche:o['Cliché']||o['Cliche']||'',
+      die:o['Die']||'',
+      gsm:o['GSM']||'',
+      metre:o['Metre']||'',
+      producedQty:o['Produce Qty.']||'',
+      printedOrPlain:o['Printed/Plain']||'',
+      _type:type,
+    };
+    if(norm.customer)target.push(norm);
+  });
+}
+
+function showImportResult2(result){
+  document.getElementById('import-result2').classList.remove('hidden');
+  const total=result.plain.length+result.printed.length+result.crvr.length;
+  document.getElementById('import-stats2').innerHTML=`
+    <div class="stat-card" style="--sc:var(--accent)"><div class="stat-label">Plain Orders</div><div class="stat-value">${result.plain.length}</div></div>
+    <div class="stat-card" style="--sc:var(--blue)"><div class="stat-label">Printed Orders</div><div class="stat-value">${result.printed.length}</div></div>
+    <div class="stat-card" style="--sc:var(--green)"><div class="stat-label">CR & VR</div><div class="stat-value">${result.crvr.length}</div></div>
+    <div class="stat-card" style="--sc:var(--brand)"><div class="stat-label">Total</div><div class="stat-value">${total}</div></div>`;
+  let html='';
+  [{label:'Plain Orders',data:result.plain},{label:'Printed Orders',data:result.printed},{label:'CR & VR',data:result.crvr}].forEach(({label,data})=>{
+    if(!data.length)return;
+    html+=`<div style="margin-bottom:14px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${label} <span style="font-weight:400;color:var(--muted)">(${data.length} rows)</span></div>`;
+    html+='<div style="overflow-x:auto;font-size:11px;border:1px solid var(--border);border-radius:10px"><table style="border-collapse:collapse;width:100%">';
+    html+='<tr style="background:var(--s2);font-size:10px;color:var(--muted);text-transform:uppercase"><th style="padding:7px;text-align:left">ID</th><th style="padding:7px;text-align:left">Customer</th><th style="padding:7px;text-align:left">Job</th><th style="padding:7px;text-align:left">Qty</th><th style="padding:7px;text-align:left">Size</th><th style="padding:7px;text-align:left">Status</th></tr>';
+    data.slice(0,6).forEach(r=>{
+      const done=String(r.status).toLowerCase().includes('done');
+      html+=`<tr style="border-top:1px solid var(--border)"><td style="padding:6px 7px;color:var(--muted)">${r.id}</td><td style="padding:6px 7px;font-weight:600">${r.customer}</td><td style="padding:6px 7px">${r.jobName}</td><td style="padding:6px 7px">${r.qty}</td><td style="padding:6px 7px;font-family:monospace">${r.size}</td><td style="padding:6px 7px"><span style="padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:${done?'#dcfce7':'#fef3c7'};color:${done?'#15803d':'#92400e'}">${r.status}</span></td></tr>`;
+    });
+    if(data.length>6)html+=`<tr><td colspan="6" style="padding:6px 7px;color:var(--muted);font-size:11px">...and ${data.length-6} more rows</td></tr>`;
+    html+='</table></div></div>';
+  });
+  document.getElementById('import-preview2').innerHTML=html;
+}
+
+async function commitExcelToFirebase(){
+  if(!_pendingExcel)return;
+  showToast('Saving to Firebase…');
+  const batch={};
+  const clean=s=>String(s||'').replace(/[.#$\/\[\]]/g,'_');
+  _pendingExcel.plain.forEach(o=>{if(o.id)batch[`excel_plain/${clean(o.id)}`]=o;});
+  _pendingExcel.printed.forEach(o=>{if(o.id)batch[`excel_printed/${clean(o.id)}`]=o;});
+  _pendingExcel.crvr.forEach(o=>{if(o.id)batch[`excel_crvr/${clean(o.id)}`]=o;});
+  batch['excel_last_import']=new Date().toISOString();
+  batch['excel_import_counts']={plain:_pendingExcel.plain.length,printed:_pendingExcel.printed.length,crvr:_pendingExcel.crvr.length,at:Date.now()};
+  try{
+    await db.ref().update(batch);
+    showToast(`✅ Saved ${_pendingExcel.plain.length+_pendingExcel.printed.length+_pendingExcel.crvr.length} records!`);
+    _pendingExcel=null;
+    updateFirebaseStatus();
+  }catch(err){showToast('Firebase error: '+err.message);}
+}
+function resetImport2(){_pendingExcel=null;document.getElementById('import-result2').classList.add('hidden');}
+
+</script>
+</body>
+</html>
