@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculator Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --text: #e8eaf0; --muted: #6b7094; --border: #2e3250;
+    --label: #00d4aa; --cash: #a78bfa; --plain: #4fc3f7;
+    --printed: #ff8a65; --warn: #ffd166;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+  .page { display: none; padding: 24px 16px 60px; }
+  .page.active { display: block; }
+  #home { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 32px 20px; }
+  #home.active { display: flex; }
+  #home header { text-align: center; margin-bottom: 48px; }
+  #home header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
+  #home header p { color: var(--muted); font-size: 0.85rem; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
+  .cards { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 420px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; cursor: pointer; transition: transform 0.15s; }
+  .card:active { transform: scale(0.98); }
+  .card.lbl { border-color: rgba(0,212,170,0.3); }
+  .card.csh { border-color: rgba(167,139,250,0.3); }
+  .card-icon { font-size: 2.2rem; margin-bottom: 14px; }
+  .card-title { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+  .card.lbl .card-title { color: var(--label); }
+  .card.csh .card-title { color: var(--cash); }
+  .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+  .card-arrow { margin-top: 18px; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+  .card.lbl .card-arrow { color: var(--label); }
+  .card.csh .card-arrow { color: var(--cash); }
+  #home footer { margin-top: 48px; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+  .back-btn { display: inline-flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .calc-header { text-align: center; margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .calc-header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 1.5rem; font-weight: 600; }
+  .calc-header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; }
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .section.wb { border-color: rgba(255,209,102,0.4); }
+  .stitle { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .stitle::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .stitle.lbl { color: var(--label); } .stitle.csh { color: var(--cash); } .stitle.warn { color: var(--warn); }
+  .sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; color: var(--warn); letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 10px; opacity: 0.8; }
+  .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .f { display: flex; flex-direction: column; gap: 6px; }
+  .f.full { grid-column: 1 / -1; }
+  label { font-size: 0.72rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  input, select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 0.95rem; padding: 10px 12px; width: 100%; transition: border-color 0.2s; -webkit-appearance: none; }
+  input:focus, select:focus { outline: none; border-color: var(--label); }
+  input.comp { background: rgba(0,212,170,0.07); border-color: rgba(0,212,170,0.3); color: var(--label); cursor: default; }
+  input.comp.csh { background: rgba(167,139,250,0.07); border-color: rgba(167,139,250,0.3); color: var(--cash); }
+  input.si { border-color: rgba(255,209,102,0.25); }
+  input.si:focus { border-color: var(--warn); }
+  select option { background: var(--surface2); }
+  .tr { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tb { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+  .tb.ap { background: rgba(79,195,247,0.15); border-color: var(--plain); color: var(--plain); }
+  .tb.apr { background: rgba(255,138,101,0.15); border-color: var(--printed); color: var(--printed); }
+  .cbtn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 0.95rem; font-weight: 600; cursor: pointer; letter-spacing: 1px; margin-top: 8px; color: #0f1117; }
+  .cbtn.lbl { background: var(--label); } .cbtn.csh { background: var(--cash); }
+  .cbtn:active { opacity: 0.9; transform: scale(0.98); }
+  .stoggle { width: 100%; padding: 13px; background: transparent; color: var(--warn); border: 1px solid rgba(255,209,102,0.35); border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; cursor: pointer; letter-spacing: 1px; }
+  .sbtn { width: 100%; padding: 13px; background: var(--warn); color: #0f1117; border: none; border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-top: 16px; }
+  .rbtn { width: 100%; padding: 10px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; cursor: pointer; margin-top: 8px; }
+  .smsg { display: none; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--warn); margin-top: 10px; }
+  .rg { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .rc { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .rc.agl { border-color: var(--label); background: rgba(0,212,170,0.08); }
+  .rc.agc { border-color: var(--cash); background: rgba(167,139,250,0.08); }
+  .rl { font-size: 0.65rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .rv { font-family: 'IBM Plex Mono', monospace; font-size: 1.2rem; font-weight: 600; color: var(--text); }
+  .rv.big { font-size: 1.5rem; }
+  .rv.lbl { color: var(--label); } .rv.csh { color: var(--cash); }
+  .ir { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.8rem; border-bottom: 1px solid rgba(46,50,80,0.4); }
+  .ir:last-child { border-bottom: none; }
+  .ir span:first-child { color: var(--muted); }
+  .ir span:last-child  { font-family: 'IBM Plex Mono', monospace; }
+  .ir.tot span { color: var(--text); font-weight: 600; }
+  .mt { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; margin-top: 10px; }
+  .mt th { color: var(--muted); padding: 6px 4px; text-align: right; font-weight: 400; border-bottom: 1px solid var(--border); font-size: 0.65rem; }
+  .mt th:first-child { text-align: left; }
+  .mt td { padding: 7px 4px; text-align: right; border-bottom: 1px solid rgba(46,50,80,0.4); }
+  .mt td:first-child { text-align: left; color: var(--muted); font-size: 0.7rem; }
+  .mt .cv { color: var(--plain); } .mt .mv { color: var(--printed); }
+  .mt .sh td { background: rgba(46,50,80,0.5); color: var(--muted); font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; padding: 4px; }
+  .pp { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--warn); margin-top: 4px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home" class="page active">
+  <header>
+    <h1>⬡ CALCULATOR HUB</h1>
+    <p>Select a calculator to get started</p>
+  </header>
+  <div class="cards">
+    <div class="card lbl" onclick="go('labelPage')">
+      <div class="card-icon">🏷</div>
+      <div class="card-title">Label Calculator</div>
+      <div class="card-desc">Cost & selling price for label rolls. Plain & printed, all paper types, core sizes, indirect costs.</div>
+      <div class="card-arrow">Open Calculator →</div>
+    </div>
+    <div class="card csh" onclick="go('cashPage')">
+      <div class="card-icon">💵</div>
+      <div class="card-title">Cash Roll Calculator</div>
+      <div class="card-desc">Cost & selling price for cash rolls. Plain & printed, paper widths, jumbo meters, indirect costs.</div>
+      <div class="card-arrow">Open Calculator →</div>
+    </div>
+  </div>
+  <footer>All settings saved locally in your browser</footer>
+</div>
+
+<!-- LABEL PAGE -->
+<div id="labelPage" class="page">
+  <div class="back-btn" onclick="go('home')">← Home</div>
+  <div class="calc-header">
+    <h1 style="color:var(--label)">⬡ LABEL CALCULATOR</h1>
+    <p>Cost & Selling Price Estimator</p>
+  </div>
+
+  <div class="section">
+    <div class="stitle lbl">Roll Specs</div>
+    <div class="fg">
+      <div class="f"><label>Roll Length (mm)</label><input type="number" id="l-rL" value="60" oninput="lLive()"></div>
+      <div class="f"><label>Waste (mm)</label><input type="number" id="l-wa" value="3" oninput="lLive()"></div>
+      <div class="f"><label>Roll Width (mm)</label><input type="number" id="l-rW" value="145" oninput="lLive()"></div>
+      <div class="f"><label>Jumbo Roll Size (mm)</label><input type="number" id="l-ju" value="160" oninput="lLive()"></div>
+      <div class="f full"><label>Total Label mm — auto calculated</label><input type="text" id="l-b5" class="comp" readonly></div>
+      <div class="f"><label>Qty Stickers</label><input type="number" id="l-qS" value="1000"></div>
+      <div class="f"><label>Qty Rolls</label><input type="number" id="l-qR" value="200"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stitle lbl">Paper & Materials</div>
+    <div class="fg">
+      <div class="f full">
+        <label>Paper Type</label>
+        <select id="l-pt" onchange="lPriceUpdate()">
+          <option value="ttl">TTL</option>
+          <option value="ttllam" selected>TTL LAM</option>
+          <option value="dtl">DTL</option>
+          <option value="vl">Vl</option>
+          <option value="ppm">PPM</option>
+          <option value="ppw">PPW</option>
+          <option value="ppc">PPC</option>
+          <option value="silver">Silver</option>
+          <option value="fragile">Fragile</option>
+        </select>
+        <div class="pp" id="l-pp">—</div>
+      </div>
+      <div class="f">
+        <label>Core Size</label>
+        <select id="l-cs" onchange="lPriceUpdate()">
+          <option value="core25">25mm</option>
+          <option value="core40" selected>40mm</option>
+          <option value="core76">76mm</option>
+        </select>
+        <div class="pp" id="l-cp">—</div>
+      </div>
+      <div class="f"><label>Core Length (mm)</label><input type="number" id="l-cL" value="1000"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stitle lbl">Label Type</div>
+    <div class="tr">
+      <button class="tb ap" id="l-bPl" onclick="lMode('plain')">Plain</button>
+      <button class="tb" id="l-bPr" onclick="lMode('printed')">Printed</button>
+    </div>
+    <div id="l-pf" class="fg hidden">
+      <div class="f full"><label>No. of Clichés</label><input type="number" id="l-cQ" value="4"></div>
+    </div>
+  </div>
+
+  <button class="cbtn lbl" onclick="lCalc()">CALCULATE →</button>
+
+  <div class="section hidden" id="l-res">
+    <div class="stitle lbl">Roll Geometry</div>
+    <div class="rg">
+      <div class="rc"><div class="rl">Outs per Jumbo</div><div class="rv" id="l-outs">—</div></div>
+      <div class="rc"><div class="rl">No. of Jumbos</div><div class="rv" id="l-jumbos">—</div></div>
+      <div class="rc"><div class="rl">SQM per Roll</div><div class="rv" id="l-sqmR">—</div></div>
+      <div class="rc"><div class="rl">Total SQM</div><div class="rv" id="l-sqmT">—</div></div>
+    </div>
+    <div class="stitle lbl" style="margin-top:4px">Direct Cost Breakdown</div>
+    <div class="ir"><span>Paper cost / roll</span><span id="l-rPaper">—</span></div>
+    <div class="ir"><span>Core cost / roll</span><span id="l-rCore">—</span></div>
+    <div class="ir"><span>Carton cost / roll</span><span id="l-rCarton">—</span></div>
+    <div class="ir hidden" id="l-rCl-row"><span>Cliché / roll</span><span id="l-rCliche">—</span></div>
+    <div class="ir hidden" id="l-rInk-row"><span>Ink / roll</span><span id="l-rInk">—</span></div>
+    <div class="ir tot"><span>Direct cost / roll</span><span id="l-rDirect">—</span></div>
+    <div class="ir"><span>Total direct (all rolls)</span><span id="l-rDirectT">—</span></div>
+    <div class="stitle lbl" style="margin-top:16px">Indirect Cost Breakdown</div>
+    <div class="ir"><span>Rent / roll</span><span id="l-rRent">—</span></div>
+    <div class="ir"><span>Labour / roll</span><span id="l-rLabour">—</span></div>
+    <div class="ir"><span>Electricity / roll</span><span id="l-rElec">—</span></div>
+    <div class="ir"><span>Others / roll</span><span id="l-rOthers">—</span></div>
+    <div class="ir tot"><span>Total indirect / roll</span><span id="l-rInd">—</span></div>
+    <div class="stitle lbl" style="margin-top:16px">Final Cost</div>
+    <div class="rg">
+      <div class="rc agl"><div class="rl" id="l-costLbl">Cost / Roll</div><div class="rv big lbl" id="l-rCost">—</div></div>
+      <div class="rc"><div class="rl">Total Cost (all rolls)</div><div class="rv" id="l-rTotal">—</div></div>
+    </div>
+    <div class="stitle lbl" style="margin-top:4px">Selling Price by Markup %</div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;">Cost+% = cost×(1+markup) | Margin = cost÷(1−markup)</p>
+    <table class="mt">
+      <thead><tr><th>Method</th><th>25%</th><th>30%</th><th>35%</th><th>40%</th><th>45%</th><th>50%</th></tr></thead>
+      <tbody>
+        <tr class="sh"><td colspan="7">Without Indirect</td></tr>
+        <tr><td id="l-dlc">Cost+%</td><td class="cv" id="l-dc25">—</td><td class="cv" id="l-dc30">—</td><td class="cv" id="l-dc35">—</td><td class="cv" id="l-dc40">—</td><td class="cv" id="l-dc45">—</td><td class="cv" id="l-dc50">—</td></tr>
+        <tr><td id="l-dlm">Margin</td><td class="mv" id="l-dm25">—</td><td class="mv" id="l-dm30">—</td><td class="mv" id="l-dm35">—</td><td class="mv" id="l-dm40">—</td><td class="mv" id="l-dm45">—</td><td class="mv" id="l-dm50">—</td></tr>
+        <tr class="sh"><td colspan="7">With Indirect</td></tr>
+        <tr><td id="l-flc">Cost+%</td><td class="cv" id="l-fc25">—</td><td class="cv" id="l-fc30">—</td><td class="cv" id="l-fc35">—</td><td class="cv" id="l-fc40">—</td><td class="cv" id="l-fc45">—</td><td class="cv" id="l-fc50">—</td></tr>
+        <tr><td id="l-flm">Margin</td><td class="mv" id="l-fm25">—</td><td class="mv" id="l-fm30">—</td><td class="mv" id="l-fm35">—</td><td class="mv" id="l-fm40">—</td><td class="mv" id="l-fm45">—</td><td class="mv" id="l-fm50">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:32px"><button class="stoggle" onclick="tog('l-set')">⚙ SETTINGS — Edit Costs &amp; Defaults</button></div>
+  <div class="section wb hidden" id="l-set" style="margin-top:12px">
+    <div class="stitle warn">Label Settings</div>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:16px;font-family:'IBM Plex Mono',monospace;">Saved in your browser. Tap Save after changes.</p>
+    <div class="sub">📄 Paper Costs (per SQM)</div>
+    <div class="fg">
+      <div class="f"><label>TTL</label><input type="number" class="si" id="ls-ttl" step="0.01"></div>
+      <div class="f"><label>TTL LAM</label><input type="number" class="si" id="ls-ttllam" step="0.01"></div>
+      <div class="f"><label>DTL</label><input type="number" class="si" id="ls-dtl" step="0.01"></div>
+      <div class="f"><label>Vl</label><input type="number" class="si" id="ls-vl" step="0.01"></div>
+      <div class="f"><label>PPM</label><input type="number" class="si" id="ls-ppm" step="0.01"></div>
+      <div class="f"><label>PPW</label><input type="number" class="si" id="ls-ppw" step="0.01"></div>
+      <div class="f"><label>PPC</label><input type="number" class="si" id="ls-ppc" step="0.01"></div>
+      <div class="f"><label>Silver</label><input type="number" class="si" id="ls-silver" step="0.01"></div>
+      <div class="f"><label>Fragile</label><input type="number" class="si" id="ls-fragile" step="0.01"></div>
+    </div>
+    <div class="sub">🔘 Core Costs</div>
+    <div class="fg">
+      <div class="f"><label>25mm Core</label><input type="number" class="si" id="ls-core25" step="0.01"></div>
+      <div class="f"><label>40mm Core</label><input type="number" class="si" id="ls-core40" step="0.01"></div>
+      <div class="f"><label>76mm Core</label><input type="number" class="si" id="ls-core76" step="0.01"></div>
+    </div>
+    <div class="sub">📦 Carton</div>
+    <div class="fg">
+      <div class="f"><label>Carton Cost (R)</label><input type="number" class="si" id="ls-cartonCost" step="0.01"></div>
+      <div class="f"><label>Rolls per Carton</label><input type="number" class="si" id="ls-cartonQty"></div>
+    </div>
+    <div class="sub">🏭 Indirect Costs (Monthly)</div>
+    <div class="fg">
+      <div class="f"><label>Rent (R)</label><input type="number" class="si" id="ls-rent"></div>
+      <div class="f"><label>Labour (R)</label><input type="number" class="si" id="ls-labour"></div>
+      <div class="f"><label>Electricity (R)</label><input type="number" class="si" id="ls-elec"></div>
+      <div class="f"><label>Others (R)</label><input type="number" class="si" id="ls-others"></div>
+      <div class="f full"><label>Annual SQM Reference</label><input type="number" class="si" id="ls-annualSqm"></div>
+    </div>
+    <div class="sub">🖨 Printing Costs</div>
+    <div class="fg">
+      <div class="f"><label>Cliché Cost (R)</label><input type="number" class="si" id="ls-clicheCost" step="0.01"></div>
+      <div class="f"><label>Ink Factor (per mm²)</label><input type="number" class="si" id="ls-inkFactor" step="0.0001"></div>
+      <div class="f full"><label>Ink Coverage</label><input type="number" class="si" id="ls-inkCoverage"></div>
+    </div>
+    <button class="sbtn" onclick="lSave()">💾 SAVE SETTINGS</button>
+    <button class="rbtn" onclick="lReset()">↺ Reset to Defaults</button>
+    <div class="smsg" id="l-smsg"></div>
+  </div>
+</div>
+
+<!-- CASH PAGE -->
+<div id="cashPage" class="page">
+  <div class="back-btn" onclick="go('home')">← Home</div>
+  <div class="calc-header">
+    <h1 style="color:var(--cash)">💵 CASH ROLL CALCULATOR</h1>
+    <p>Cost & Selling Price Estimator</p>
+  </div>
+
+  <div class="section">
+    <div class="stitle csh">Roll Specs</div>
+    <div class="fg">
+      <div class="f"><label>Roll Length (m)</label><input type="number" id="c-rL" value="50" oninput="cLive()"></div>
+      <div class="f"><label>Waste (m)</label><input type="number" id="c-wa" value="0.1" step="0.01" oninput="cLive()"></div>
+      <div class="f"><label>Roll Width (mm)</label><input type="number" id="c-rW" value="78" oninput="cLive()"></div>
+      <div class="f"><label>Jumbo Roll Size (mm)</label><input type="number" id="c-ju" value="790" oninput="cLive()"></div>
+      <div class="f full"><label>Total Label mm — auto calculated</label><input type="text" id="c-b5" class="comp csh" readonly></div>
+      <div class="f"><label>Jumbo Meter (m)</label><input type="number" id="c-jM" value="5000"></div>
+      <div class="f"><label>Qty Rolls</label><input type="number" id="c-qR" value="5000"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stitle csh">Paper</div>
+    <div class="fg">
+      <div class="f full">
+        <label>Paper Width (mm)</label>
+        <select id="c-pw" onchange="cPriceUpdate()">
+          <option value="55">55mm</option>
+          <option value="65" selected>65mm</option>
+          <option value="75">75mm</option>
+        </select>
+        <div class="pp" id="c-pp">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stitle csh">Label Type</div>
+    <div class="tr">
+      <button class="tb ap" id="c-bPl" onclick="cMode('plain')">Plain</button>
+      <button class="tb" id="c-bPr" onclick="cMode('printed')">Printed</button>
+    </div>
+    <div id="c-pf" class="fg hidden">
+      <div class="f full"><label>No. of Clichés</label><input type="number" id="c-cQ" value="4"></div>
+    </div>
+  </div>
+
+  <button class="cbtn csh" onclick="cCalc()">CALCULATE →</button>
+
+  <div class="section hidden" id="c-res">
+    <div class="stitle csh">Roll Geometry</div>
+    <div class="rg">
+      <div class="rc"><div class="rl">Outs per Jumbo</div><div class="rv" id="c-outs">—</div></div>
+      <div class="rc"><div class="rl">No. of Jumbos</div><div class="rv" id="c-jumbos">—</div></div>
+      <div class="rc"><div class="rl">SQM per Roll</div><div class="rv" id="c-sqmR">—</div></div>
+      <div class="rc"><div class="rl">Total SQM</div><div class="rv" id="c-sqmT">—</div></div>
+    </div>
+    <div class="stitle csh" style="margin-top:4px">Direct Cost Breakdown</div>
+    <div class="ir"><span>Paper cost / roll</span><span id="c-rPaper">—</span></div>
+    <div class="ir"><span>Core cost / roll</span><span id="c-rCore">—</span></div>
+    <div class="ir"><span>Carton cost / roll</span><span id="c-rCarton">—</span></div>
+    <div class="ir hidden" id="c-rCl-row"><span>Cliché / roll</span><span id="c-rCliche">—</span></div>
+    <div class="ir hidden" id="c-rInk-row"><span>Ink / roll</span><span id="c-rInk">—</span></div>
+    <div class="ir tot"><span>Direct cost / roll</span><span id="c-rDirect">—</span></div>
+    <div class="ir"><span>Total direct (all rolls)</span><span id="c-rDirectT">—</span></div>
+    <div class="stitle csh" style="margin-top:16px">Indirect Cost Breakdown</div>
+    <div class="ir"><span>Rent / roll</span><span id="c-rRent">—</span></div>
+    <div class="ir"><span>Labour / roll</span><span id="c-rLabour">—</span></div>
+    <div class="ir"><span>Electricity / roll</span><span id="c-rElec">—</span></div>
+    <div class="ir"><span>Others / roll</span><span id="c-rOthers">—</span></div>
+    <div class="ir tot"><span>Total indirect / roll</span><span id="c-rInd">—</span></div>
+    <div class="stitle csh" style="margin-top:16px">Final Cost</div>
+    <div class="rg">
+      <div class="rc agc"><div class="rl" id="c-costLbl">Cost / Roll</div><div class="rv big csh" id="c-rCost">—</div></div>
+      <div class="rc"><div class="rl">Total Cost (all rolls)</div><div class="rv" id="c-rTotal">—</div></div>
+    </div>
+    <div class="stitle csh" style="margin-top:4px">Selling Price by Markup %</div>
+    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;">Cost+% = cost×(1+markup) | Margin = cost÷(1−markup)</p>
+    <table class="mt">
+      <thead><tr><th>Method</th><th>25%</th><th>30%</th><th>35%</th><th>40%</th><th>45%</th><th>50%</th></tr></thead>
+      <tbody>
+        <tr class="sh"><td colspan="7">Without Indirect</td></tr>
+        <tr><td id="c-dlc">Cost+%</td><td class="cv" id="c-dc25">—</td><td class="cv" id="c-dc30">—</td><td class="cv" id="c-dc35">—</td><td class="cv" id="c-dc40">—</td><td class="cv" id="c-dc45">—</td><td class="cv" id="c-dc50">—</td></tr>
+        <tr><td id="c-dlm">Margin</td><td class="mv" id="c-dm25">—</td><td class="mv" id="c-dm30">—</td><td class="mv" id="c-dm35">—</td><td class="mv" id="c-dm40">—</td><td class="mv" id="c-dm45">—</td><td class="mv" id="c-dm50">—</td></tr>
+        <tr class="sh"><td colspan="7">With Indirect</td></tr>
+        <tr><td id="c-flc">Cost+%</td><td class="cv" id="c-fc25">—</td><td class="cv" id="c-fc30">—</td><td class="cv" id="c-fc35">—</td><td class="cv" id="c-fc40">—</td><td class="cv" id="c-fc45">—</td><td class="cv" id="c-fc50">—</td></tr>
+        <tr><td id="c-flm">Margin</td><td class="mv" id="c-fm25">—</td><td class="mv" id="c-fm30">—</td><td class="mv" id="c-fm35">—</td><td class="mv" id="c-fm40">—</td><td class="mv" id="c-fm45">—</td><td class="mv" id="c-fm50">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:32px"><button class="stoggle" onclick="tog('c-set')">⚙ SETTINGS — Edit Costs &amp; Defaults</button></div>
+  <div class="section wb hidden" id="c-set" style="margin-top:12px">
+    <div class="stitle warn">Cash Roll Settings</div>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:16px;font-family:'IBM Plex Mono',monospace;">Saved in your browser. Tap Save after changes.</p>
+    <div class="sub">📄 Paper Costs (per SQM)</div>
+    <div class="fg">
+      <div class="f"><label>55mm Paper</label><input type="number" class="si" id="cs-p55" step="0.01"></div>
+      <div class="f"><label>65mm Paper</label><input type="number" class="si" id="cs-p65" step="0.01"></div>
+      <div class="f"><label>75mm Paper</label><input type="number" class="si" id="cs-p75" step="0.01"></div>
+    </div>
+    <div class="sub">🔘 Core & Carton</div>
+    <div class="fg">
+      <div class="f"><label>Core Cost (R)</label><input type="number" class="si" id="cs-coreCost" step="0.01"></div>
+      <div class="f"><label>Carton Cost (R)</label><input type="number" class="si" id="cs-cartonCost" step="0.01"></div>
+      <div class="f"><label>Rolls per Carton</label><input type="number" class="si" id="cs-cartonQty"></div>
+    </div>
+    <div class="sub">🏭 Indirect Costs (Monthly)</div>
+    <div class="fg">
+      <div class="f"><label>Rent (R)</label><input type="number" class="si" id="cs-rent"></div>
+      <div class="f"><label>Labour (R)</label><input type="number" class="si" id="cs-labour"></div>
+      <div class="f"><label>Electricity (R)</label><input type="number" class="si" id="cs-elec"></div>
+      <div class="f"><label>Others (R)</label><input type="number" class="si" id="cs-others"></div>
+      <div class="f full"><label>Annual Meter Reference (D32)</label><input type="number" class="si" id="cs-annualRef"></div>
+    </div>
+    <div class="sub">🖨 Printing Costs</div>
+    <div class="fg">
+      <div class="f"><label>Cliché Cost (R)</label><input type="number" class="si" id="cs-clicheCost" step="0.01"></div>
+      <div class="f"><label>Ink Factor (per mm²)</label><input type="number" class="si" id="cs-inkFactor" step="0.0001"></div>
+      <div class="f full"><label>Ink Coverage</label><input type="number" class="si" id="cs-inkCoverage"></div>
+    </div>
+    <button class="sbtn" onclick="cSave()">💾 SAVE SETTINGS</button>
+    <button class="rbtn" onclick="cReset()">↺ Reset to Defaults</button>
+    <div class="smsg" id="c-smsg"></div>
+  </div>
+</div>
+
+<script>
+// NAV
+function go(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function tog(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+// HELPERS
+function v(id) { return parseFloat(document.getElementById(id).value)||0; }
+function fmt(n,d) { return 'R '+n.toFixed(d!=null?d:2); }
+function S(id,val) { const e=document.getElementById(id); if(e) e.textContent=val; }
+function showMsg(id,msg) { const e=document.getElementById(id); e.textContent=msg; e.style.display='block'; setTimeout(()=>e.style.display='none',2500); }
+
+// ===== LABEL SETTINGS =====
+const LD = { ttl:1.0,ttllam:1.3,dtl:1.0,vl:1.0,ppm:1.2,ppw:1.2,ppc:1.2,silver:5.0,fragile:6.0, core25:1.3,core40:1.4,core76:1.9, cartonCost:1.6,cartonQty:50, rent:28125,labour:66000,elec:3500,others:15000,annualSqm:540000, clicheCost:150,inkFactor:0.001,inkCoverage:60 };
+let LS={};
+const LPN={ttl:'TTL',ttllam:'TTL LAM',dtl:'DTL',vl:'Vl',ppm:'PPM',ppw:'PPW',ppc:'PPC',silver:'Silver',fragile:'Fragile'};
+const LCN={core25:'25mm',core40:'40mm',core76:'76mm'};
+
+function lLoad() {
+  try { const s=localStorage.getItem('lCalc'); LS=s?{...LD,...JSON.parse(s)}:{...LD}; } catch(e){LS={...LD};}
+  Object.keys(LD).forEach(k=>{const e=document.getElementById('ls-'+k);if(e)e.value=LS[k];});
+  lPriceUpdate();
+}
+function lSave() {
+  Object.keys(LD).forEach(k=>{const e=document.getElementById('ls-'+k);if(e)LS[k]=parseFloat(e.value)||LD[k];});
+  try{localStorage.setItem('lCalc',JSON.stringify(LS));}catch(e){}
+  lPriceUpdate(); showMsg('l-smsg','✓ Settings saved!');
+}
+function lReset() {
+  LS={...LD}; Object.keys(LD).forEach(k=>{const e=document.getElementById('ls-'+k);if(e)e.value=LS[k];});
+  try{localStorage.removeItem('lCalc');}catch(e){}
+  lPriceUpdate(); showMsg('l-smsg','✓ Reset to defaults!');
+}
+function lPriceUpdate() {
+  const sel=document.getElementById('l-pt');
+  Array.from(sel.options).forEach(o=>{o.text=LPN[o.value]+' — R'+(LS[o.value]||0).toFixed(2);});
+  document.getElementById('l-pp').textContent='Cost: R'+(LS[sel.value]||0).toFixed(2)+' per SQM';
+  const ck=document.getElementById('l-cs').value;
+  document.getElementById('l-cp').textContent='Cost: R'+(LS[ck]||0).toFixed(2)+' per core';
+}
+
+// LABEL MODE & LIVE
+let lm='plain';
+function lMode(m) {
+  lm=m;
+  document.getElementById('l-bPl').className='tb'+(m==='plain'?' ap':'');
+  document.getElementById('l-bPr').className='tb'+(m==='printed'?' apr':'');
+  document.getElementById('l-pf').classList.toggle('hidden',m==='plain');
+}
+function lLive() {
+  const rw=v('l-rW'),j=v('l-ju'),w=v('l-wa');
+  const E6=Math.floor((j-10)/rw),F6=E6-1;
+  document.getElementById('l-b5').value=(10+E6*rw+F6*w)+' mm';
+}
+
+// LABEL CALCULATE
+function lCalc() {
+  const rL=v('l-rL'),wa=v('l-wa'),rW=v('l-rW'),ju=v('l-ju'),qS=v('l-qS'),qR=v('l-qR');
+  const E6=Math.floor((ju-10)/rW),B7=E6;
+  const C10=(qS+wa)*rL*qR,B11=(C10/B7/1e6)*1.05;
+  const B13=B11*(ju/qR),C13=B13*qR;
+  const pk=document.getElementById('l-pt').value;
+  const B17=B13*(LS[pk]||1.0);
+  const ck=document.getElementById('l-cs').value;
+  const C21=LS[ck]||1.4,D21=v('l-cL')/rW,B21=C21/D21;
+  const B22=LS.cartonCost/LS.cartonQty;
+  const B20=LS.clicheCost*v('l-cQ'),B23=LS.inkFactor*LS.inkCoverage*C13;
+  const cPR=B20/qR,iPR=B23/qR;
+  const B26=B17+B21+B22,B27=B17+cPR+B21+B22+iPR;
+  const dC=lm==='plain'?B26:B27;
+  const D32=LS.annualSqm;
+  const B32=(LS.rent/D32)*C13/qR,B33=(LS.labour/D32)*C13/qR,B34=(LS.elec/D32)*C13/qR,B35=(LS.others/D32)*C13/qR;
+  const B37=B32+B33+B34+B35,fC=dC+B37,tC=fC*qR;
+  const ip=lm==='printed',lb=ip?'Printed':'Plain';
+  document.getElementById('l-res').classList.remove('hidden');
+  S('l-outs',B7); S('l-jumbos',B11.toFixed(4));
+  S('l-sqmR',B13.toFixed(6)+' m²'); S('l-sqmT',C13.toFixed(4)+' m²');
+  S('l-rPaper',fmt(B17)); S('l-rCore',fmt(B21)); S('l-rCarton',fmt(B22));
+  S('l-rDirect',fmt(dC)); S('l-rDirectT',fmt(dC*qR));
+  document.getElementById('l-rCl-row').classList.toggle('hidden',!ip);
+  document.getElementById('l-rInk-row').classList.toggle('hidden',!ip);
+  if(ip){S('l-rCliche',fmt(cPR));S('l-rInk',fmt(iPR));}
+  S('l-rRent',fmt(B32)); S('l-rLabour',fmt(B33)); S('l-rElec',fmt(B34)); S('l-rOthers',fmt(B35)); S('l-rInd',fmt(B37));
+  S('l-costLbl',lb+' Cost / Roll'); S('l-rCost',fmt(fC)); S('l-rTotal',fmt(tC));
+  S('l-dlc',lb+' Cost+%'); S('l-dlm',lb+' Margin'); S('l-flc',lb+' Cost+%'); S('l-flm',lb+' Margin');
+  [25,30,35,40,45,50].forEach(p=>{const mu=p/100;
+    S('l-dc'+p,fmt(dC*(1+mu))); S('l-dm'+p,fmt(dC/(1-mu)));
+    S('l-fc'+p,fmt(fC*(1+mu))); S('l-fm'+p,fmt(fC/(1-mu)));
+  });
+  document.getElementById('l-res').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ===== CASH SETTINGS =====
+const CD={p55:0.34,p65:0.52,p75:0.50,coreCost:0.07,cartonCost:1.6,cartonQty:50,rent:9375,labour:24000,elec:1500,others:5000,annualRef:675000,clicheCost:350,inkFactor:0.001,inkCoverage:20};
+let CS={};
+
+function cLoad() {
+  try{const s=localStorage.getItem('cCalc');CS=s?{...CD,...JSON.parse(s)}:{...CD};}catch(e){CS={...CD};}
+  Object.keys(CD).forEach(k=>{const e=document.getElementById('cs-'+k);if(e)e.value=CS[k];});
+  cPriceUpdate();
+}
+function cSave() {
+  Object.keys(CD).forEach(k=>{const e=document.getElementById('cs-'+k);if(e)CS[k]=parseFloat(e.value)||CD[k];});
+  try{localStorage.setItem('cCalc',JSON.stringify(CS));}catch(e){}
+  cPriceUpdate(); showMsg('c-smsg','✓ Settings saved!');
+}
+function cReset() {
+  CS={...CD}; Object.keys(CD).forEach(k=>{const e=document.getElementById('cs-'+k);if(e)e.value=CS[k];});
+  try{localStorage.removeItem('cCalc');}catch(e){}
+  cPriceUpdate(); showMsg('c-smsg','✓ Reset to defaults!');
+}
+function cPriceUpdate() {
+  const sel=document.getElementById('c-pw');
+  sel.options[0].text='55mm — R'+CS.p55.toFixed(2);
+  sel.options[1].text='65mm — R'+CS.p65.toFixed(2);
+  sel.options[2].text='75mm — R'+CS.p75.toFixed(2);
+  const map={'55':CS.p55,'65':CS.p65,'75':CS.p75};
+  document.getElementById('c-pp').textContent='Cost: R'+(map[sel.value]||0).toFixed(2)+' per SQM';
+}
+
+// CASH MODE & LIVE
+let cm='plain';
+function cMode(m) {
+  cm=m;
+  document.getElementById('c-bPl').className='tb'+(m==='plain'?' ap':'');
+  document.getElementById('c-bPr').className='tb'+(m==='printed'?' apr':'');
+  document.getElementById('c-pf').classList.toggle('hidden',m==='plain');
+}
+function cLive() {
+  const rw=v('c-rW'),j=v('c-ju');
+  const E6=Math.floor((j-10)/rw);
+  document.getElementById('c-b5').value=(10+E6*rw)+' mm';
+}
+
+// CASH CALCULATE
+function cCalc() {
+  const rL=v('c-rL'),wa=v('c-wa'),rW=v('c-rW'),ju=v('c-ju'),jM=v('c-jM'),qR=v('c-qR');
+  const E6=Math.floor((ju-10)/rW),B7=E6;
+  const C10=(rL+wa)*qR,B11=C10/B7/jM;
+  const B13=B11*(ju/1000),C13=B13*qR;
+  const pw=document.getElementById('c-pw').value;
+  const pcm={'55':CS.p55,'65':CS.p65,'75':CS.p75};
+  const B17=B13*(pcm[pw]||CS.p65);
+  const B21=CS.coreCost,B22=CS.cartonCost/CS.cartonQty;
+  const B20=CS.clicheCost*v('c-cQ'),B23=CS.inkFactor*CS.inkCoverage*C13;
+  const cPR=B20/qR,iPR=B23/qR;
+  const B26=B17+B21+B22,B27=B17+cPR+B21+B22+iPR;
+  const dC=cm==='plain'?B26:B27;
+  const D32=CS.annualRef;
+  const B32=(CS.rent/D32)*C13/qR,B33=(CS.labour/D32)*C13/qR,B34=(CS.elec/D32)*C13/qR,B35=(CS.others/D32)*C13/qR;
+  const B37=B32+B33+B34+B35,fC=dC+B37,tC=fC*qR;
+  const ip=cm==='printed',lb=ip?'Printed':'Plain';
+  document.getElementById('c-res').classList.remove('hidden');
+  S('c-outs',B7); S('c-jumbos',B11.toFixed(4));
+  S('c-sqmR',B13.toFixed(6)+' m²'); S('c-sqmT',C13.toFixed(4)+' m²');
+  S('c-rPaper',fmt(B17,4)); S('c-rCore',fmt(B21,4)); S('c-rCarton',fmt(B22,4));
+  S('c-rDirect',fmt(dC,4)); S('c-rDirectT',fmt(dC*qR,2));
+  document.getElementById('c-rCl-row').classList.toggle('hidden',!ip);
+  document.getElementById('c-rInk-row').classList.toggle('hidden',!ip);
+  if(ip){S('c-rCliche',fmt(cPR,4));S('c-rInk',fmt(iPR,4));}
+  S('c-rRent',fmt(B32,4)); S('c-rLabour',fmt(B33,4)); S('c-rElec',fmt(B34,4)); S('c-rOthers',fmt(B35,4)); S('c-rInd',fmt(B37,4));
+  S('c-costLbl',lb+' Cost / Roll'); S('c-rCost',fmt(fC,4)); S('c-rTotal',fmt(tC,2));
+  S('c-dlc',lb+' Cost+%'); S('c-dlm',lb+' Margin'); S('c-flc',lb+' Cost+%'); S('c-flm',lb+' Margin');
+  [25,30,35,40,45,50].forEach(p=>{const mu=p/100;
+    S('c-dc'+p,fmt(dC*(1+mu),4)); S('c-dm'+p,fmt(dC/(1-mu),4));
+    S('c-fc'+p,fmt(fC*(1+mu),4)); S('c-fm'+p,fmt(fC/(1-mu),4));
+  });
+  document.getElementById('c-res').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// INIT
+window.onload=function(){
+  lLoad(); lLive();
+  cLoad(); cLive();
+};
+</script>
+</body>
+</html>
